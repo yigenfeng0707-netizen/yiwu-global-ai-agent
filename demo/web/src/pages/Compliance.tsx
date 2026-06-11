@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown, Loader2, ShieldCheck, FileCheck, AlertTriangle, Calculator, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { categories } from '@/store/useStore';
-import { fetchComplianceCheck, calculateTariff, type ComplianceData } from '@/utils/api';
+import { fetchComplianceCheck, calculateTariff } from '@/utils/api';
 
 const countries = ['德国', '法国', '西班牙', '荷兰', '波兰', '哈萨克斯坦', '乌兹别克斯坦', '沙特阿拉伯', '阿联酋', '伊朗', '土耳其', '印尼', '泰国', '越南', '马来西亚'];
 

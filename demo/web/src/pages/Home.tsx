@@ -10,7 +10,6 @@ import {
   Headphones,
   Truck,
   ShoppingBag,
-  Sparkles,
   Cpu,
   Shirt,
   Gem,

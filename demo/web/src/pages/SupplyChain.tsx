@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  ChevronDown, Loader2, Truck, Building2, Package, FileCheck,
+  ChevronDown, Loader2, Building2, Package, FileCheck,
   Train, ShieldCheck, CheckCircle2, Circle, Star,
 } from 'lucide-react';
 import { categories } from '@/store/useStore';
