@@ -260,7 +260,7 @@ YiWuInternetCompetition/
 
 ## 联系方式
 
-- 项目地址：[GitHub Repository](https://github.com)
-- 邮箱：contact@yiwu-global-ai.com
+- 项目地址：https://github.com/yigenfeng0707-netizen/yiwu-global-ai-agent
+- 邮箱：fengyigen@qq.com
 - 参赛团队：义乌小商品出海智能体团队
 - 参赛赛道：2026"直通乌镇"全球互联网大赛 OPC特色赛
