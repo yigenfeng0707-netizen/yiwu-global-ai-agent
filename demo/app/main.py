@@ -37,18 +37,19 @@ app.add_middleware(SignatureMiddleware)
 app.include_router(router, prefix="/api/v1")
 
 
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "service": "yiwu-chuhai-api"}
+
+
 if WEB_DIST.is_dir():
-    # 单容器模式：前端静态资源 + SPA 路由回退（API 路由已注册，优先匹配）
+    # 单容器模式：前端静态资源 + SPA 路由回退（显式路由已注册，兜底路由必须最后定义）
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa(full_path: str):
         target = WEB_DIST / full_path
         if full_path and target.is_file():
             return FileResponse(target)
         return FileResponse(WEB_DIST / "index.html")
-
-    @app.get("/health")
-    async def health():
-        return {"status": "healthy", "service": "yiwu-chuhai-api"}
 
 else:
     # 纯 API 模式（Render 等前后端分离部署）
@@ -59,7 +60,3 @@ else:
             "version": "2.0.0",
             "description": "基于义乌小商品城7.5万商户、210万+SKU，为跨境电商提供一站式AI智能服务",
         }
-
-    @app.get("/health")
-    async def health():
-        return {"status": "healthy", "service": "yiwu-chuhai-api"}

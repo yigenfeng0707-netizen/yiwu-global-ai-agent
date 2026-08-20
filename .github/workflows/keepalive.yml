@@ -24,7 +24,9 @@ jobs:
           if [ "$STATUS" = "Running" ]; then
             echo "运行中，唤醒健康检查..."
             SERVICE_URL="https://${MS_OWNER}-${MS_REPO}.ms.show"
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$SERVICE_URL/health" || true)
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+              -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+              "$SERVICE_URL/health" || true)
             echo "health check: $HTTP_CODE"
           else
             echo "非 Running，触发重新部署..."
