@@ -1,0 +1,60 @@
+{
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/welcome",
+      "type": "data",
+      "description": "Return a welcome message describing the v2 capabilities."
+    },
+    {
+      "method": "POST",
+      "path": "/ask",
+      "type": "data",
+      "streamable": true,
+      "description": "Answer a question via streaming RAG over the remio knowledge base (义乌跨境 OPC 知识库).",
+      "params": {
+        "input": { "type": "string", "required": true, "description": "The question to answer" }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/competitor-research",
+      "type": "data",
+      "streamable": true,
+      "description": "Autonomously fetch real competitor pages (Amazon/AliExpress/1688) via headless browser and synthesize structured insights. Demonstrates tool-calling & autonomy.",
+      "params": {
+        "input": { "type": "string", "required": true, "description": "Product or category to research" }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/select-product",
+      "type": "data",
+      "streamable": true,
+      "description": "Smart product selection recommendation grounded in the OPC knowledge base.",
+      "params": {
+        "input": { "type": "string", "required": false, "description": "Optional niche / category" }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/compliance-check",
+      "type": "data",
+      "streamable": true,
+      "description": "Cross-border compliance & certification checklist grounded in the OPC knowledge base.",
+      "params": {
+        "input": { "type": "string", "required": false, "description": "Optional product / market" }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/policy-replicate",
+      "type": "data",
+      "streamable": true,
+      "description": "Policy replication & Jinyi New District landing playbook grounded in the OPC knowledge base.",
+      "params": {
+        "input": { "type": "string", "required": false, "description": "Optional target market / policy" }
+      }
+    }
+  ]
+}

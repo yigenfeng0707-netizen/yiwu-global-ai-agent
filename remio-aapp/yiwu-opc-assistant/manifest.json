@@ -1,0 +1,61 @@
+{
+  "id": "yiwu-opc-assistant",
+  "name": "义乌小商品出海助手",
+  "description": "基于 remio 知识库（义乌跨境 OPC 知识库）与真实网页自主抓取的义乌小商品出海智能体：回答 1039 市场采购、RCEP 关税、跨境合规与认证、智能选品、金义新区落地政策，并自主抓取 Amazon/AliExpress/1688 竞品页面做实采分析。",
+  "icon": "🛒",
+  "activationAction": {
+    "method": "GET",
+    "path": "/welcome",
+    "presentation": "chat"
+  },
+  "agentEndpoint": {
+    "method": "POST",
+    "path": "/ask"
+  },
+  "chatMenu": {
+    "type": "static",
+    "items": [
+      {
+        "label": "1039 市场采购怎么免税？",
+        "action": {
+          "prompt": "1039 市场采购贸易方式如何免征增值税、简化申报？",
+          "presentation": "chat"
+        }
+      },
+      {
+        "label": "竞品实采（自主抓网页）",
+        "action": {
+          "prompt": "请竞品实采：无线耳机",
+          "presentation": "chat"
+        }
+      },
+      {
+        "label": "智能选品推荐",
+        "action": {
+          "prompt": "帮我做智能选品推荐",
+          "presentation": "chat"
+        }
+      },
+      {
+        "label": "跨境合规检查",
+        "action": {
+          "prompt": "帮我做跨境合规检查",
+          "presentation": "chat"
+        }
+      },
+      {
+        "label": "政策复制与金义新区落地",
+        "action": {
+          "prompt": "如何做政策复制与金义新区落地",
+          "presentation": "chat"
+        }
+      }
+    ]
+  },
+  "runtime": {
+    "type": "embedded"
+  },
+  "type": "aapp",
+  "version": "2",
+  "developer": "义乌小商品出海智能体-OPC"
+}

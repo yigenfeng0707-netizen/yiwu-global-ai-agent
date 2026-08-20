@@ -7,7 +7,7 @@
 
 **YiWu Global AI Agent** — 基于7大AI Agent的跨境电商一站式智能服务平台
 
-> 参赛赛道：2026"直通乌镇"全球互联网大赛 OPC特色赛；金漪湖·论剑 2026 智能体 OPC 创新创业大赛 · OPC 智能体赛道
+> 主参赛赛道：**金漪湖·论剑 2026 智能体 OPC 创新创业大赛 · OPC 智能体赛道**（官方工具 remio 睿妙）。注：作品亦可适配"直通乌镇"等 OPC 相关赛事，请以金漪湖·论剑 OPC 智能体赛道要求为准。
 
 ## 项目简介
 
@@ -77,11 +77,16 @@ python -m app.main      # 或: uvicorn app.main:app --host 0.0.0.0 --port 8000
 - 合规/政策/选品 Agent 会优先检索这些知识（见 `app/knowledge/remio_kb.py`）；
 - 后端配置 `REMIO_LIVE_CLI=auto` 时，remio 桌面端在运行会**实时通过 remio CLI 语义检索**官方知识库（已实测命中）。
 
-### 已发布的 remio aApp（金漪湖赛道交付物）
+### 已发布的 remio aApp（金漪湖赛道交付物 · v2）
 - aApp 名称：**义乌小商品出海助手**（aApp ID：`yiwu-opc-assistant`）
-- 市场包：`https://storage.googleapis.com/remio_aapp_market_prod/yiwu-opc-assistant/yiwu-opc-assistant-v1.zip`
-- 用法：在 remio 桌面端「aApps / 应用市场」搜索「义乌小商品出海助手」打开；直接提问即可基于 remio 知识库（义乌跨境 OPC 知识库）获得带引用的回答（1039 政策 / RCEP 关税 / 跨境合规 / 智能选品 / 金义新区落地）。
-- 该 aApp 由 `app/knowledge/remio_export/` 的 5 篇笔记作为知识底座，满足赛道"使用官方工具 remio 构建知识库 + 提供 aApp 链接"的硬性要求。
+- 市场包：`https://storage.googleapis.com/remio_aapp_market_prod/yiwu-opc-assistant/yiwu-opc-assistant-v2.zip`
+- 用法：在 remio 桌面端「aApps / 应用市场」搜索「义乌小商品出海助手」打开。
+- **核心能力（直击赛道"工具调用与自主性"评分点）**：
+  - `POST /competitor-research` — 智能体**自主调用无头浏览器（`headless_fetch_content`）真实抓取 Amazon / AliExpress / 1688 竞品页面**，再用 LLM 提炼价格/卖点/差异化/选品建议；
+  - `POST /ask` — 基于 remio 知识库（义乌跨境 OPC 知识库）流式问答，带引用；
+  - `POST /select-product`、`POST /compliance-check`、`POST /policy-replicate` — 多端点编排的选品/合规/政策复制能力。
+- 知识底座为 `app/knowledge/remio_export/` 的 5 篇笔记（1039 政策 / RCEP 关税 / 跨境合规 / 智能选品 / 金义新区落地），满足赛道"使用官方工具 remio 构建知识库 + 提供 aApp 链接"的硬性要求。
+- 源码归档见 `remio-aapp/yiwu-opc-assistant/`。
 
 ### 前端启动
 ```bash
