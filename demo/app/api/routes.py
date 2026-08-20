@@ -9,13 +9,14 @@ from ..agents.compliance_agent import ComplianceAgent
 from ..agents.customer_service_agent import CustomerServiceAgent
 from ..agents.supply_chain_agent import SupplyChainAgent
 from ..agents.policy_replication_agent import PolicyReplicationAgent
+from ..agents.competitor_research_agent import CompetitorResearchAgent
 from ..agents.workflow import CrossBorderWorkflow, WorkflowState
 from ..data.market_data import CATEGORY_LIST, SUPPORTED_REGIONS, YIWU_INDEX, YIXINOU_DATA, YIWU_TRADE_CITY
 from ..data.sources import DataSourceManager
 from ..models.schemas import (
     ContentGenerateRequest, CustomerChatRequest, TariffCalcRequest,
     LoginRequest, RegisterRequest, PipelineRequest, SupplyChainRequest, LogisticsRequest,
-    PolicyBenefitCalcRequest, LocalizedCaseRequest,
+    PolicyBenefitCalcRequest, LocalizedCaseRequest, CompetitorResearchRequest,
 )
 from ..services.auth import auth_service
 from ..services.llm import llm_service
@@ -30,6 +31,7 @@ compliance_agent = ComplianceAgent()
 customer_agent = CustomerServiceAgent()
 supply_chain_agent = SupplyChainAgent()
 policy_replication_agent = PolicyReplicationAgent()
+competitor_agent = CompetitorResearchAgent()
 workflow = CrossBorderWorkflow()
 data_manager = DataSourceManager()
 
@@ -58,6 +60,7 @@ async def get_agents_info():
             {"name": "customer_service", "display_name": "智能客服", "status": "online", "description": "多语言智能客服与FAQ"},
             {"name": "supply_chain", "display_name": "供应链匹配", "status": "online", "description": "供应链与物流智能匹配"},
             {"name": "policy_replication", "display_name": "政策复制", "status": "online", "description": "1039政策解读、39城复制推广、红利计算"},
+            {"name": "competitor_research", "display_name": "竞品实采", "status": "online", "description": "浏览器自主操作，在Amazon/1688真实调研竞品"},
         ]
     }
 
@@ -98,6 +101,29 @@ async def get_yiwu_trade_city():
 async def get_market_insight(category: str = CATEGORY_LIST[0], region: str = SUPPORTED_REGIONS[0]):
     """市场洞察"""
     result = await market_agent.execute(category=category, region=region)
+    return result
+
+
+# ==================== 竞品实采（智能体自主性 / 工具调用） ====================
+
+@router.post("/competitor-research")
+async def post_competitor_research(req: CompetitorResearchRequest):
+    """竞品实采：智能体在真实电商网站自主搜索并抽取竞品情报"""
+    result = await competitor_agent.execute(
+        query=req.query or req.category,
+        platform=req.platform,
+        country=req.country,
+        max_items=req.max_items,
+    )
+    return result
+
+
+@router.get("/competitor-research")
+async def get_competitor_research(query: str = "", category: str = CATEGORY_LIST[0], platform: str = "amazon", country: str = "US", max_items: int = 8):
+    """竞品实采（GET）：智能体在真实电商网站自主调研竞品"""
+    result = await competitor_agent.execute(
+        query=query or category, platform=platform, country=country, max_items=max_items,
+    )
     return result
 
 
@@ -282,6 +308,7 @@ async def get_status():
             "customer_service": "online",
             "supply_chain": "online",
             "policy_replication": "online",
+            "competitor_research": "online",
         },
         "llm_usage": llm_service.daily_usage,
         "data_sources": len(data_manager.list_sources()),

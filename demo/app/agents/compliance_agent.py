@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 
 from .base import BaseAgent
 from ..data.market_data import CATEGORY_LIST
+from ..knowledge.remio_kb import remio_kb
 from ..data.compliance_data import (
     COUNTRY_COMPLIANCE, CLEARANCE_DOCUMENTS, YIXINOU_TARIFF_BENEFITS,
     RCEP_TARIFF_BENEFITS, CATEGORY_SPECIAL_REQUIREMENTS, CERTIFICATION_PROCESS,
@@ -36,6 +37,10 @@ class ComplianceAgent(BaseAgent):
         # 关税优惠
         tariff_benefits = self._get_tariff_benefits(target_country)
 
+        # remio 睿妙知识库检索（官方工具）：优先据此补充权威知识
+        remio_ctx = remio_kb.context_for(f"{category} {target_country} 合规 认证 关税 清关")
+        knowledge_source = "remio 睿妙知识库 + 内置数据" if remio_ctx else "内置数据"
+
         return self._wrap_response({
             "category": category,
             "target_country": target_country,
@@ -47,6 +52,8 @@ class ComplianceAgent(BaseAgent):
             },
             "special_requirements": special_requirements,
             "tariff_benefits": tariff_benefits,
+            "knowledge_source": knowledge_source,
+            "remio_knowledge": remio_ctx,
         })
 
     async def calculate_tariff(self, category: str, target_country: str, product_value: float) -> Dict[str, Any]:

@@ -4,6 +4,7 @@ import random
 from typing import Any, Dict, List
 
 from .base import BaseAgent
+from ..knowledge.remio_kb import remio_kb
 from ..data.market_data import MARKET_DATA, CATEGORY_LIST, SUPPORTED_REGIONS
 
 
@@ -38,6 +39,10 @@ class SmartSelectionAgent(BaseAgent):
         # 行动计划
         action_plan = self._get_action_plan(category, region)
 
+        # remio 睿妙知识库检索（官方工具）：优先据此补充选品方法论
+        remio_ctx = remio_kb.context_for(f"{category} {region} 选品 方法论 利润 蓝海")
+        knowledge_source = "remio 睿妙知识库 + 内置数据" if remio_ctx else "内置数据"
+
         return self._wrap_response({
             "category": category,
             "budget": budget,
@@ -48,6 +53,8 @@ class SmartSelectionAgent(BaseAgent):
             "profit_analysis": profit_analysis,
             "supply_recommendations": supply_recommendations,
             "action_plan": action_plan,
+            "knowledge_source": knowledge_source,
+            "remio_knowledge": remio_ctx,
         })
 
     def _calculate_score(self, category: str, region: str, budget: str) -> Dict[str, Any]:

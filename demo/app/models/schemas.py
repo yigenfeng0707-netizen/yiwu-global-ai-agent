@@ -113,3 +113,11 @@ class PolicyBenefitCalcRequest(BaseModel):
 class LocalizedCaseRequest(BaseModel):
     case_id: int = 1
     target_city: str = ""
+
+
+class CompetitorResearchRequest(BaseModel):
+    query: Optional[str] = None
+    category: str = "日用百货"
+    platform: str = "amazon"
+    country: str = "US"
+    max_items: int = 8

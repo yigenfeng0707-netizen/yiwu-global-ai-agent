@@ -4,3 +4,5 @@ pydantic>=2.5.0
 python-multipart>=0.0.6
 httpx>=0.25.0
 PyJWT>=2.8.0
+# 竞品实采工具（智能体自主性）：在真实网站自主调研。如不需要可移除。
+playwright>=1.40.0

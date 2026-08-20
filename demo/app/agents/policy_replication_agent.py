@@ -3,6 +3,7 @@
 from typing import Any, Dict, List, Optional
 
 from .base import BaseAgent
+from ..knowledge.remio_kb import remio_kb
 from ..data.policy_data import (
     CITY_1039_DATA, POLICY_1039_DETAIL, YIWU_SUCCESS_CASES,
     POLICY_BENEFIT_PARAMS,
@@ -37,12 +38,16 @@ class PolicyReplicationAgent(BaseAgent):
             )
         else:
             # 默认返回概览
+            remio_ctx = remio_kb.context_for("1039市场采购贸易 政策 红利 复制推广")
+            knowledge_source = "remio 睿妙知识库 + 内置数据" if remio_ctx else "内置数据"
             return self._wrap_response({
                 "total_cities": len(CITY_1039_DATA),
                 "policy_name": POLICY_1039_DETAIL["policy_name"],
                 "policy_code": POLICY_1039_DETAIL["policy_code"],
                 "key_benefits": [p["title"] for p in POLICY_1039_DETAIL["key_points"][:3]],
                 "cases_count": len(YIWU_SUCCESS_CASES),
+                "knowledge_source": knowledge_source,
+                "remio_knowledge": remio_ctx,
             })
 
     async def get_policy_guide(self) -> Dict[str, Any]:

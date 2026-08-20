@@ -3,9 +3,12 @@
 import random
 from typing import Any, Dict, List
 
+import os
+
 from .base import BaseAgent
 from ..data.market_data import MARKET_DATA, CATEGORY_LIST, SUPPORTED_REGIONS, YIWU_INDEX
 from ..data.sources import DataSourceManager
+from ..tools.competitor_research import CompetitorResearchTool
 
 
 class MarketInsightAgent(BaseAgent):
@@ -20,6 +23,7 @@ class MarketInsightAgent(BaseAgent):
     async def execute(self, **kwargs) -> Dict[str, Any]:
         category = kwargs.get("category", CATEGORY_LIST[0])
         region = kwargs.get("region", SUPPORTED_REGIONS[0])
+        live = os.getenv("ENABLE_LIVE_COMPETITOR", "0") == "1"
 
         market_data = MARKET_DATA.get(category, {})
 
@@ -38,6 +42,16 @@ class MarketInsightAgent(BaseAgent):
 
         # 竞争格局
         competitors = self._get_competitors(category, region)
+
+        # 真实竞品实采（智能体自主性）：启用后调用浏览器在真实网站调研
+        live_competitor_data = None
+        if live:
+            try:
+                tool = CompetitorResearchTool()
+                live = await tool.research(query=category, platform="amazon", country="US")
+                live_competitor_data = live
+            except Exception:
+                live_competitor_data = None
 
         # 推荐产品
         recommendations = self._get_recommendations(category, region)
@@ -66,6 +80,7 @@ class MarketInsightAgent(BaseAgent):
             "trends": trends,
             "price_tiers": price_tiers,
             "competitors": competitors,
+            "live_competitor_data": live_competitor_data,
             "recommendations": recommendations,
             "risks": risks,
             "yiwu_index": yiwu_index,
