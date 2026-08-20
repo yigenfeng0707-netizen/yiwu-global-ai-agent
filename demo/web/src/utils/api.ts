@@ -2,7 +2,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 import {
   mockMarketInsight, mockSmartSelection, mockSupplyChain, mockLogistics,
-  mockContentGeneration, mockCompliance, mockTariff, mockChatResponse, mockChatReply,
+  mockContentGeneration, mockCompliance, mockTariff, mockChatReply,
   mockFAQ, mockPipeline, mockPolicyCities, mockPolicyGuide,
   mockPolicyBenefit, mockPolicyCases,
 } from './mockData';

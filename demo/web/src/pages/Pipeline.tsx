@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronRight, Download, Loader2, Play, CheckCircle2, Circle, BarChart3, Target, Sparkles, ShieldCheck, HelpCircle, Truck, RefreshCw, Building2 } from 'lucide-react';
 import { categories } from '@/store/useStore';
 import { runPipeline, type PipelineResult } from '@/utils/api';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, ShadingType } from 'docx';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle } from 'docx';
 import { saveAs } from 'file-saver';
 
 const regions = ['欧洲（义新欧班列直达）', '中亚', '中东', '东南亚', '非洲', '南美'];

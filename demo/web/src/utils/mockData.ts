@@ -277,6 +277,7 @@ export const mockFAQ = (category: string, language: string) => ({
     { q_zh: '如何开始义乌小商品跨境出口？', a_zh: '步骤：1)在义乌市场选品采购 2)办理1039市场采购贸易备案 3)选择物流方式(义新欧班列/海运) 4)办理出口报关 5)目标市场清关配送。', q_en: 'How to start Yiwu cross-border export?', a_en: 'Steps: 1) Source in Yiwu market 2) Register for 1039 trade 3) Choose logistics 4) Export customs 5) Destination clearance.' },
   ],
   category,
+  language,
 });
 
 // ==================== 全链路工作流 Mock ====================
