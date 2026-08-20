@@ -167,8 +167,9 @@ YiWuInternetCompetition/
 │   │   └── tailwind.config.js
 │   ├── requirements.txt
 │   └── .env.example
-├── README.md
-└── 用户使用手册.docx
+├── docs/                            # 参赛文档（商业计划书、技术文档、路演PPT、答辩QA等）
+├── scripts/                         # 文档生成与推送脚本
+└── README.md
 ```
 
 ## API概览
