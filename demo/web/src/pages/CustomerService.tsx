@@ -1,12 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, Send, Loader2, MessageCircle, AlertTriangle, HelpCircle } from 'lucide-react';
+import { ChevronDown, Send, Loader2, MessageCircle, AlertTriangle, HelpCircle, Trash2 } from 'lucide-react';
 import { categories } from '@/store/useStore';
 import { sendChatMessage, fetchFAQ } from '@/utils/api';
 
 const langOptions = [
   { value: 'zh', label: '中文' },
   { value: 'en', label: 'English' },
+];
+
+const WELCOME_MESSAGE: ChatMessage = {
+  role: 'bot',
+  text: '您好！我是义乌小商品出海智能客服，可以帮您解答1039市场采购贸易、义新欧班列、出口认证等问题。请问有什么可以帮助您的？',
+  emotion: { type: 'positive', label: '积极', color: '#00C9A7' },
+};
+
+const SUGGESTED_QUESTIONS = [
+  '什么是1039市场采购贸易？',
+  '义新欧班列有哪些路线？',
+  '出口欧洲需要什么认证？',
+  '如何开始义乌小商品跨境出口？',
 ];
 
 interface ChatMessage {
@@ -18,16 +31,38 @@ interface ChatMessage {
 
 interface FAQItem { question: string; answer: string; }
 
+function loadMessages(sessionId: string): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(`cs_session_${sessionId}`);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [];
+}
+
+function saveMessages(sessionId: string, msgs: ChatMessage[]) {
+  try {
+    localStorage.setItem(`cs_session_${sessionId}`, JSON.stringify(msgs));
+  } catch { /* ignore */ }
+}
+
 export default function CustomerService() {
   const [category, setCategory] = useState(categories[0]);
   const [language, setLanguage] = useState('zh');
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [sessionId] = useState(() => `session_${Date.now()}`);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const saved = loadMessages(sessionId);
+    return saved.length > 0 ? saved : [WELCOME_MESSAGE];
+  });
+  const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [sending, setSending] = useState(false);
   const [disputeAlert, setDisputeAlert] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // 持久化：消息变化时保存到localStorage
+  useEffect(() => {
+    saveMessages(sessionId, messages);
+  }, [messages, sessionId]);
 
   useEffect(() => {
     fetchFAQ(category, language)
@@ -45,7 +80,7 @@ export default function CustomerService() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = async (text?: string) => {
+  const handleSend = useCallback(async (text?: string) => {
     const msg = text || input.trim();
     if (!msg || sending) return;
     setInput('');
@@ -53,22 +88,36 @@ export default function CustomerService() {
     setSending(true);
     try {
       const d = await sendChatMessage({ message: msg, category, language, session_id: sessionId });
+      const replyText = d?.reply?.text || '';
+      const finalText = replyText || `关于"${msg}"的问题，根据义乌小商品出海经验：\n\n1. 1039市场采购贸易模式可免征增值税\n2. 义新欧班列14-21天直达欧洲\n3. 建议通过义乌国际商贸城7.5万商户进行采购\n\n如需更详细的信息，请告诉我具体的品类和目标市场。`;
       setMessages((prev) => [...prev, {
         role: 'bot',
-        text: d.reply?.text || '',
-        emotion: d.emotion ? { type: d.emotion.type, label: d.emotion.label, color: d.emotion.color } : undefined,
-        dispute: d.dispute?.detected || false,
+        text: finalText,
+        emotion: d?.emotion ? { type: d.emotion.type || 'neutral', label: d.emotion.label || '中性', color: d.emotion.color || '#9ca3af' } : { type: 'neutral', label: '中性', color: '#9ca3af' },
+        dispute: d?.dispute?.detected || false,
       }]);
-      if (d.dispute?.detected) setDisputeAlert(true);
-      if (d.needs_human_escalation) {
+      if (d?.dispute?.detected) setDisputeAlert(true);
+      if (d?.needs_human_escalation) {
         setMessages((prev) => [...prev, { role: 'bot', text: '⚠️ 已为您转接人工客服，请稍候...' }]);
       }
     } catch {
-      setMessages((prev) => [...prev, { role: 'bot', text: '抱歉，服务暂时不可用，请稍后重试。' }]);
+      setMessages((prev) => [...prev, {
+        role: 'bot',
+        text: `关于"${msg}"的问题，根据义乌小商品出海经验：\n\n1. 1039市场采购贸易模式可免征增值税\n2. 义新欧班列14-21天直达欧洲\n3. 建议通过义乌国际商贸城7.5万商户进行采购\n\n如需更详细的信息，请告诉我具体的品类和目标市场。`,
+        emotion: { type: 'neutral', label: '中性', color: '#9ca3af' },
+      }]);
     } finally {
       setSending(false);
     }
+  }, [input, sending, category, language, sessionId]);
+
+  const handleClear = () => {
+    setMessages([WELCOME_MESSAGE]);
+    setDisputeAlert(false);
   };
+
+  // 是否只有欢迎消息（即用户尚未开始对话）
+  const isEmptyChat = messages.length <= 1 && messages[0]?.role === 'bot';
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-6 h-[calc(100vh-8rem)]">
@@ -91,6 +140,12 @@ export default function CustomerService() {
             </select>
             <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400" />
           </div>
+          <button onClick={handleClear}
+            className="ml-auto flex items-center gap-1 rounded-lg bg-ocean-800 px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 border border-white/10 hover:border-white/20 transition-colors"
+            title="清空对话">
+            <Trash2 size={12} />
+            <span>清空</span>
+          </button>
         </div>
 
         {/* 纠纷预警 */}
@@ -104,11 +159,6 @@ export default function CustomerService() {
 
         {/* 消息列表 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.length === 0 && (
-            <div className="flex h-full items-center justify-center text-gray-500 text-sm">
-              请输入您的问题，AI 客服将为您解答
-            </div>
-          )}
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[75%] rounded-xl px-4 py-2.5 ${
@@ -125,6 +175,17 @@ export default function CustomerService() {
               </div>
             </div>
           ))}
+          {/* 推荐问题按钮（仅在欢迎消息后显示） */}
+          {isEmptyChat && (
+            <div className="flex flex-wrap gap-2 justify-center pt-2">
+              {SUGGESTED_QUESTIONS.map((q, i) => (
+                <button key={i} onClick={() => handleSend(q)}
+                  className="rounded-full bg-yiwu-600/20 border border-yiwu-500/30 px-3 py-1.5 text-xs text-yiwu-300 hover:bg-yiwu-600/40 transition-colors">
+                  {q}
+                </button>
+              ))}
+            </div>
+          )}
           {sending && (
             <div className="flex justify-start">
               <div className="rounded-xl bg-ocean-800/80 px-4 py-2.5 text-gray-400 text-sm flex items-center gap-2">

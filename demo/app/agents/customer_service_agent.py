@@ -9,6 +9,7 @@ from ..data.market_data import CATEGORY_LIST
 from ..data.customer_service_data import (
     FAQ_DATABASE, EMOTION_TYPES, DISPUTE_KEYWORDS, AUTO_REPLY_TEMPLATES,
 )
+from ..services.llm import llm_service
 
 
 class CustomerServiceAgent(BaseAgent):
@@ -16,6 +17,11 @@ class CustomerServiceAgent(BaseAgent):
 
     name = "customer_service"
     description = "智能客服Agent - 情绪识别、FAQ匹配、纠纷检测、智能回复"
+
+    LLM_SYSTEM_PROMPT = (
+        "你是义乌小商品出海智能客服，专精1039市场采购贸易、义新欧班列、"
+        "义乌国际商贸城等领域的咨询。回答要专业、简洁、实用。"
+    )
 
     def __init__(self):
         self.sessions: Dict[str, List[Dict]] = {}
@@ -36,7 +42,7 @@ class CustomerServiceAgent(BaseAgent):
         dispute = self._detect_dispute(message)
 
         # 生成回复
-        reply = self._generate_reply(message, category, language, faq_match, emotion, dispute)
+        reply = await self._generate_reply(message, category, language, faq_match, emotion, dispute, session_id)
 
         # 是否需要转人工
         needs_human = dispute.get("detected", False) and emotion.get("type") == "negative"
@@ -114,25 +120,55 @@ class CustomerServiceAgent(BaseAgent):
 
         return {"detected": detected, "type": dispute_type}
 
-    def _generate_reply(self, message: str, category: str, language: str,
-                        faq_match: Optional[Dict], emotion: Dict, dispute: Dict) -> Dict[str, Any]:
-        """生成回复"""
-        # 纠纷优先处理
-        if dispute.get("detected"):
-            return {"text": AUTO_REPLY_TEMPLATES["dispute_detected"]}
+    async def _llm_chat(self, message: str, session_id: str = "default") -> Optional[str]:
+        """调用DashScope Qwen模型生成回复（含超时保护）"""
+        import asyncio
+        # 构建对话历史
+        history = self.sessions.get(session_id, [])
+        messages = [{"role": "system", "content": self.LLM_SYSTEM_PROMPT}]
+        for msg in history[-10:]:  # 最近10轮对话
+            role = "user" if msg["role"] == "user" else "assistant"
+            messages.append({"role": role, "content": msg["text"]})
+        messages.append({"role": "user", "content": message})
 
-        # FAQ匹配回复
+        try:
+            return await asyncio.wait_for(
+                llm_service.chat(messages, temperature=0.7, max_tokens=800),
+                timeout=8.0,
+            )
+        except (asyncio.TimeoutError, Exception):
+            return None
+
+    async def _generate_reply(self, message: str, category: str, language: str,
+                              faq_match: Optional[Dict], emotion: Dict, dispute: Dict,
+                              session_id: str = "default") -> Dict[str, Any]:
+        """生成回复"""
+        # FAQ匹配回复优先
         if faq_match:
             answer_key = "a_zh" if language == "zh" else "a_en"
             return {"text": faq_match.get(answer_key, "")}
 
-        # 物流相关
+        # 纠纷处理：先用模板回复，再调用LLM给出详细建议
+        if dispute.get("detected"):
+            template_reply = AUTO_REPLY_TEMPLATES["dispute_detected"]
+            llm_reply = await self._llm_chat(
+                f"用户遇到纠纷：{message}，纠纷类型：{dispute.get('type', '未知')}。请给出详细的处理建议。",
+                session_id,
+            )
+            if llm_reply:
+                return {"text": f"{template_reply}\n\n📋 详细建议：\n{llm_reply}"}
+            return {"text": template_reply}
+
+        # 其他情况：调用LLM生成回复
+        llm_reply = await self._llm_chat(message, session_id)
+        if llm_reply:
+            return {"text": llm_reply}
+
+        # LLM不可用时，回退到关键词模板回复
         if any(kw in message for kw in ["物流", "运输", "发货", "班列", "快递"]):
             return {"text": AUTO_REPLY_TEMPLATES["logistics_inquiry"]}
 
-        # 认证相关
         if any(kw in message for kw in ["认证", "CE", "EAC", "SABER", "检测"]):
             return {"text": AUTO_REPLY_TEMPLATES["certification_inquiry"]}
 
-        # 默认回复
         return {"text": AUTO_REPLY_TEMPLATES["unknown"]}
