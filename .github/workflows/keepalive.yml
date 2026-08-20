@@ -1,0 +1,34 @@
+name: ModelScope Studio Keepalive
+
+# 保持创空间实例存活 + 异常自愈（免费实例空闲会休眠）
+# 复用 chuyun-cup-yuanhezhishu-2026 验证过的 keepalive 模板
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # 每 5 分钟
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check status & self-heal
+        env:
+          MODELSCOPE_API_KEY: ${{ secrets.MODELSCOPE_API_KEY }}
+          MS_OWNER: ${{ vars.MS_OWNER || 'gsym236998' }}
+          MS_REPO: ${{ vars.MS_REPO_NAME || 'yiwu-global-ai-agent' }}
+        run: |
+          STATUS=$(curl -s "https://modelscope.cn/openapi/v1/studios/${MS_OWNER}/${MS_REPO}" \
+            -H "Authorization: Bearer $MODELSCOPE_API_KEY" -H "User-Agent: Mozilla/5.0" | jq -r '.data.status // empty')
+          echo "studio status: $STATUS"
+          if [ "$STATUS" = "Running" ]; then
+            echo "运行中，唤醒健康检查..."
+            SERVICE_URL="https://${MS_OWNER}-${MS_REPO}.ms.show"
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$SERVICE_URL/health" || true)
+            echo "health check: $HTTP_CODE"
+          else
+            echo "非 Running，触发重新部署..."
+            curl -s -X POST "https://modelscope.cn/openapi/v1/studios/${MS_OWNER}/${MS_REPO}/deploy" \
+              -H "Authorization: Bearer $MODELSCOPE_API_KEY" \
+              -H "Content-Type: application/json" -H "User-Agent: Mozilla/5.0"
+          fi

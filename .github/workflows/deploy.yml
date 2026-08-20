@@ -1,9 +1,8 @@
 name: Deploy
 
+# Render/Vercel 部署（凭据未配置，改为手动触发；线上部署走 deploy-modelscope.yml）
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   test:
