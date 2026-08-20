@@ -5,7 +5,17 @@ from remio_sdk import create_aapp_logger, router, syscall, syscall_stream
 
 AAPP_DIR = os.environ.get('REMIO_AAPP_DIR', '')
 LOG_DIR = os.environ.get('REMIO_AAPP_LOG_DIR', os.path.join(os.path.dirname(AAPP_DIR), 'log'))
-LOGGER = create_aapp_logger('yiwu-opc-assistant', LOG_DIR, 'main')
+try:
+    LOGGER = create_aapp_logger('yiwu-opc-assistant', LOG_DIR, 'main')
+except Exception:  # noqa: BLE001 - allow import outside host (tests / CI)
+    class _NullLogger:
+        def info(self, *a, **k):
+            pass
+        def warn(self, *a, **k):
+            pass
+        def error(self, *a, **k):
+            pass
+    LOGGER = _NullLogger()
 
 KB_NAME = '义乌跨境 OPC 知识库'
 
@@ -126,7 +136,7 @@ def handle_competitor_research(params):
     for url in urls:
         syscall('show_progress', {'text': f'无头浏览器抓取：{url}', 'toolName': 'headless_fetch_content'})
         try:
-            res = syscall('headless_fetch_content', {'url': url, 'timeout_ms': 20000})
+            res = syscall('headless_fetch_content', {'url': url})
             text = _extract(res, 'text') or ''
             title = _extract(res, 'title') or url
             if text:

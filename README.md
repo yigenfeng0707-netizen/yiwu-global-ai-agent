@@ -79,7 +79,7 @@ python -m app.main      # 或: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ### 已发布的 remio aApp（金漪湖赛道交付物 · v2）
 - aApp 名称：**义乌小商品出海助手**（aApp ID：`yiwu-opc-assistant`）
-- 市场包：`https://storage.googleapis.com/remio_aapp_market_prod/yiwu-opc-assistant/yiwu-opc-assistant-v2.zip`
+- 市场包：`https://storage.googleapis.com/remio_aapp_market_prod/yiwu-opc-assistant/yiwu-opc-assistant-v3.zip`
 - 用法：在 remio 桌面端「aApps / 应用市场」搜索「义乌小商品出海助手」打开。
 - **核心能力（直击赛道"工具调用与自主性"评分点）**：
   - `POST /competitor-research` — 智能体**自主调用无头浏览器（`headless_fetch_content`）真实抓取 Amazon / AliExpress / 1688 竞品页面**，再用 LLM 提炼价格/卖点/差异化/选品建议；
@@ -94,6 +94,13 @@ cd demo/web
 npm install
 npm run dev
 ```
+
+### 容器化运行（评委可直跑 Demo）
+```bash
+cp .env.example .env   # 填入 LLM_API_KEY
+docker compose up --build   # 启动 FastAPI 后端 :8000
+```
+详见 `docs/演示脚本与录屏指南.md`、`docs/架构设计.md`、`docs/商业计划书.md`、`docs/路演PPT大纲.md`、`docs/自评与改进.md`。
 
 ## API 概览（节选）
 

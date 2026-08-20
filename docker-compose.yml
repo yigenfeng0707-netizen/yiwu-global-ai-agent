@@ -1,0 +1,14 @@
+services:
+  yiwa-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - COMPETITOR_RESEARCH_ENABLED=true
+      - ENABLE_LIVE_COMPETITOR=0
+      - REMIO_LIVE_CLI=auto
+    # 真实浏览器竞品实采：设为 1 且宿主机已装 playwright chromium 时启用
+    # ENABLE_LIVE_COMPETITOR: "1"
