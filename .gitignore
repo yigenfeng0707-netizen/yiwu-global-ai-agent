@@ -13,6 +13,11 @@ demo_narr_tmp/
 *.wav
 *.pyc
 
+# ---- Binary media (kept on GitHub Releases / archive, never pushed to source) ----
+*.mp4
+*.mov
+*.webm
+
 # ---- OS ----
 .DS_Store
 Thumbs.db
