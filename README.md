@@ -111,6 +111,7 @@ docker compose up --build   # 启动 FastAPI 后端 :8000
 - `demo_video_autonomous.mp4`：端到端**自主闭环**演示（约 4 分 18 秒），Agent 接收单一目标后**自主决策**每一步调用哪个工具（决策卡可见），全程基于真实抓取数据，`scripts/make_autonomous_video.py` 生成。
 - 真实编排器 `scripts/autonomous_agent.py`：给定单一目标，由 **LLM 规划 + 规则兜底**自主决定下一步调用哪个 aApp 端点（rag / headless_fetch_content / run_prompt），并把上一步真实输出作为下一步上下文；产出 `demo_autonomous_live_transcript.md`（实时跑通，含 5 张决策卡）。视频即该编排器的可视化。
 - **《出海诊断报告》自动生成器** `scripts/make_diagnosis_report.py <品类>`：对任意品类自动跑通「合规确认→竞品实采→智能选品→合规检查→政策复制」五步并产出商户向报告（实时抓取；remio 离线时回退已验证实录并标注）。示例：`docs/出海诊断报告_宠物用品.md`、`docs/出海诊断报告样例_无线耳机.md`。
+- **参赛提交打包** `scripts/prepare_submission.py`：一键把全部提交物（4 档视频 + 文档 + 实录 + aApp 说明）归集到 `submission/` 并生成 `提交清单.md` 与 `APP_INFO.txt`；将 `submission/` 压缩后上传至 51tokenlink.com 即可。提交要求见 `docs/比赛提交清单与流程.md`。
 - `demo_video_hook.mp4`：路演开场钩子视频（约 56 秒，开场口播 + 真实价格卡 + 收尾），适配路演/短视频，`scripts/make_hook_video.py` 生成；口播稿见 `docs/30秒路演hook.md`。
 - 现场 live 演示：双击 `run_live_demo.bat`（需 remio 桌面端在线）即实时跑通自主编排器。
 
