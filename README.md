@@ -100,7 +100,7 @@ npm run dev
 cp .env.example .env   # 填入 LLM_API_KEY
 docker compose up --build   # 启动 FastAPI 后端 :8000
 ```
-详见 `docs/演示脚本与录屏指南.md`、`docs/架构设计.md`、`docs/商业计划书.md`、`docs/金义新区落地方案.md`、`docs/路演一页纸.md`、`docs/30秒路演hook.md`、`docs/路演PPT大纲.md`、`docs/自评与改进.md`。
+详见 `docs/演示脚本与录屏指南.md`、`docs/架构设计.md`、`docs/商业计划书.md`、`docs/金义新区落地方案.md`、`docs/路演一页纸.md`、`docs/30秒路演hook.md`、`docs/商户合作意向书_LOI模板.md`、`docs\致金义新区投促局的对接函.md`、`docs\商户内测邀请（一页纸）.md`、`docs/路演PPT大纲.md`、`docs/自评与改进.md`。
 
 ### Demo 实录（API 驱动，无需录屏）
 - `scripts/demo_capture.py`：通过 `remio --cn` CLI 重放 aApp 所用的同一组 syscall（rag / headless_fetch_content / run_prompt），真实捕获知识库问答（带引用）与竞品实采（真实无头浏览器抓取）输出。
