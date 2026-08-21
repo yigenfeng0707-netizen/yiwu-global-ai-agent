@@ -82,6 +82,7 @@ def synthesize(prompt, timeout=90):
 def build_search_urls(query):
     q = urllib.parse.quote(query)
     return [
+        f'https://www.walmart.com/search?q={q}',
         f'https://www.amazon.com/s?k={q}',
         f'https://www.aliexpress.com/wholesale?SearchText={q}',
         f'https://s.1688.com/offer/offer_search.htm?keywords={q}',
@@ -108,8 +109,8 @@ def main():
         L.append(f'\n### 抓取：{url}')
         title, text = headless_fetch(url)
         if text:
-            L.append(f'- 标题：{title}\n- 正文摘要（前 600 字）：\n\n{text[:600]}')
-            snippets.append(f'## 来源：{title}\n{text[:3500]}')
+            L.append(f'- 标题：{title}\n- 正文摘要（前 800 字）：\n\n{text[:800]}')
+            snippets.append(f'## 来源：{title}\n{text[:6000]}')
         else:
             L.append(f'- {text}')
     if snippets:
