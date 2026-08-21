@@ -16,6 +16,8 @@ import json
 import wave
 import subprocess
 import tempfile
+import numpy as np
+import soundfile as sf
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -34,7 +36,7 @@ GOOD = (120, 220, 150)
 FONT_PATH = r'C:\Windows\Fonts\msyh.ttc'
 LINES_PER_SLIDE = 20
 EXTRA_PAGE_SEC = 4.2
-BGM_VOL = 0.07
+BGM_VOL = 0.10
 
 
 def load_font(size):
@@ -157,15 +159,52 @@ OUTRO = ('作品信息与落地承诺',
          '本作品已发布到 remio 应用市场，源码开源。核心能力是智能体的工具调用与自主性。若获奖，我们将注册落地金义新区、入驻 OPC 社区，并向全国三十九个试点城市复制推广。')
 
 
-def gen_bgm(path, dur):
-    subprocess.run([
-        FFMPEG, '-y', '-f', 'lavfi',
-        '-i', f'sine=frequency=110:sample_rate=22050:duration={dur}',
-        '-f', 'lavfi',
-        '-i', f'sine=frequency=164.81:sample_rate=22050:duration={dur}',
-        '-filter_complex', 'amix=inputs=2:duration=first',
-        '-ac', '1', path
-    ], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=120)
+def compose_music(path, dur):
+    """Compose a gentle 4-chord (I-V-vi-IV) loop with arpeggio, fully offline."""
+    sr = 22050
+    chords = [
+        [261.63, 329.63, 392.00],   # C major
+        [196.00, 246.94, 293.66],   # G major
+        [220.00, 261.63, 329.63],   # A minor
+        [174.61, 220.00, 261.63],   # F major
+    ]
+    arps = [
+        [523.25, 659.25, 783.99, 1046.50],
+        [392.00, 493.88, 587.33, 783.99],
+        [440.00, 523.25, 659.25, 880.00],
+        [349.23, 440.00, 523.25, 698.46],
+    ]
+
+    def tone(freq, d, harm=0.22):
+        t = np.linspace(0, d, int(sr * d), endpoint=False)
+        a = int(0.02 * sr)
+        r = int(0.25 * sr)
+        env = np.ones_like(t)
+        env[:a] = np.linspace(0, 1, a)
+        env[-r:] = np.linspace(1, 0, r)
+        w = np.sin(2 * np.pi * freq * t) + harm * np.sin(2 * np.pi * 2 * freq * t)
+        return w * env
+
+    bar = 2.0
+    loop = np.zeros(int(sr * bar * len(chords)))
+    for bi in range(len(chords)):
+        chord = np.zeros(int(sr * bar))
+        for f in chords[bi]:
+            chord += tone(f, bar, harm=0.15) * 0.16
+        notes = arps[bi]
+        step = bar / len(notes)
+        for ai, f in enumerate(notes):
+            seg = tone(f, step, harm=0.12) * 0.20
+            s0 = int(ai * step * sr)
+            chord[s0:s0 + len(seg)] += seg
+        chord_full = np.zeros_like(loop)
+        chord_full[bi * int(sr * bar):(bi + 1) * int(sr * bar)] = chord
+        loop += chord_full
+    loop /= (np.max(np.abs(loop)) + 1e-9)
+    loop *= 0.55
+    total = int(dur * sr)
+    full = np.tile(loop, total // len(loop) + 1)[:total]
+    sf.write(path, full.astype(np.float32), sr)
 
 
 def build_clip(img, audio, dur, out_path, fade_in=False, bgm=None):
@@ -242,7 +281,7 @@ def main():
 
     # background music (one long file, trimmed per clip)
     bgm_path = os.path.join(TMP, 'bgm.wav')
-    gen_bgm(bgm_path, 400)
+    compose_music(bgm_path, 400)
 
     def tts_wav(idx):
         return os.path.join(TMP, f'n{idx}.wav')
