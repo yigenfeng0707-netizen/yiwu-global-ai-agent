@@ -105,14 +105,16 @@ docker compose up --build   # 启动 FastAPI 后端 :8000
 ### Demo 实录（API 驱动，无需录屏）
 - `scripts/demo_capture.py`：通过 `remio --cn` CLI 重放 aApp 所用的同一组 syscall（rag / headless_fetch_content / run_prompt），真实捕获知识库问答（带引用）与竞品实采（真实无头浏览器抓取）输出。
 - `demo_api_transcript.md`：自动生成的演示实录，可作为演示证据直接提交（亦可后续转视频）。
-- `demo_video.mp4`：由实录渲染的演示视频（PIL + ffmpeg，约 3 分钟，完整展示真实抓取数据），`scripts/make_demo_video.py` 可重生成。
-- `demo_video_narrated.mp4`：含离线中文配音的精修演示版（约 4 分钟，`scripts/make_polished.py` 生成），新增**竞品价格高亮大字卡**、片头淡入动画、钢琴曲《茉莉花》背景音乐，逐页展示真实竞品价格/评分/来源（Windows Speech TTS，无需联网）。配音时长严格对齐字幕，无中途掐断。
-- `demo_video_short.mp4`：60 秒社媒短版（约 54 秒，片头 + 价格大字卡 + 竞品/选品要点 + 片尾），适合短视频平台传播。
-- `demo_video_autonomous.mp4`：端到端**自主闭环**演示（约 4 分 18 秒），Agent 接收单一目标后**自主决策**每一步调用哪个工具（决策卡可见），全程基于真实抓取数据，`scripts/make_autonomous_video.py` 生成。
+> 演示视频已统一托管于 GitHub Release（本地不保留二进制，避免仓库膨胀）：**https://github.com/yigenfeng0707-netizen/yiwu-global-ai-agent/releases/tag/v1.0-demo**
+
+- [`demo_video.mp4`](https://github.com/yigenfeng0707-netizen/yiwu-global-ai-agent/releases/tag/v1.0-demo)：由实录渲染的演示视频（PIL + ffmpeg，约 3 分钟，完整展示真实抓取数据），`scripts/make_demo_video.py` 可重生成。
+- [`demo_video_narrated.mp4`](https://github.com/yigenfeng0707-netizen/yiwu-global-ai-agent/releases/tag/v1.0-demo)：含离线中文配音的精修演示版（约 4 分钟，`scripts/make_polished.py` 生成），新增**竞品价格高亮大字卡**、片头淡入动画、钢琴曲《茉莉花》背景音乐，逐页展示真实竞品价格/评分/来源（Windows Speech TTS，无需联网）。配音时长严格对齐字幕，无中途掐断。
+- [`demo_video_short.mp4`](https://github.com/yigenfeng0707-netizen/yiwu-global-ai-agent/releases/tag/v1.0-demo)：60 秒社媒短版（约 54 秒，片头 + 价格大字卡 + 竞品/选品要点 + 片尾），适合短视频平台传播。
+- [`demo_video_autonomous.mp4`](https://github.com/yigenfeng0707-netizen/yiwu-global-ai-agent/releases/tag/v1.0-demo)：端到端**自主闭环**演示（约 4 分 18 秒），Agent 接收单一目标后**自主决策**每一步调用哪个工具（决策卡可见），全程基于真实抓取数据，`scripts/make_autonomous_video.py` 生成。
 - 真实编排器 `scripts/autonomous_agent.py`：给定单一目标，由 **LLM 规划 + 规则兜底**自主决定下一步调用哪个 aApp 端点（rag / headless_fetch_content / run_prompt），并把上一步真实输出作为下一步上下文；产出 `demo_autonomous_live_transcript.md`（实时跑通，含 5 张决策卡）。视频即该编排器的可视化。
 - **《出海诊断报告》自动生成器** `scripts/make_diagnosis_report.py <品类>`：对任意品类自动跑通「合规确认→竞品实采→智能选品→合规检查→政策复制」五步并产出商户向报告（实时抓取；remio 离线时回退已验证实录并标注）。示例：`docs/出海诊断报告_宠物用品.md`、`docs/出海诊断报告样例_无线耳机.md`。
 - **参赛提交打包** `scripts/prepare_submission.py`：一键把全部提交物（4 档视频 + 文档 + 实录 + aApp 说明）归集到 `submission/` 并生成 `提交清单.md` 与 `APP_INFO.txt`；将 `submission/` 压缩后上传至 51tokenlink.com 即可。提交要求见 `docs/比赛提交清单与流程.md`。
-- `demo_video_hook.mp4`：路演开场钩子视频（约 56 秒，开场口播 + 真实价格卡 + 收尾），适配路演/短视频，`scripts/make_hook_video.py` 生成；口播稿见 `docs/30秒路演hook.md`。
+- [`demo_video_hook.mp4`](https://github.com/yigenfeng0707-netizen/yiwu-global-ai-agent/releases/tag/v1.0-demo)：路演开场钩子视频（约 56 秒，开场口播 + 真实价格卡 + 收尾），适配路演/短视频，`scripts/make_hook_video.py` 生成；口播稿见 `docs/30秒路演hook.md`。
 - 现场 live 演示：双击 `run_live_demo.bat`（需 remio 桌面端在线）即实时跑通自主编排器。
 
 ## API 概览（节选）
