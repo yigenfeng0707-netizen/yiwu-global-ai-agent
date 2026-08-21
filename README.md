@@ -105,8 +105,8 @@ docker compose up --build   # 启动 FastAPI 后端 :8000
 ### Demo 实录（API 驱动，无需录屏）
 - `scripts/demo_capture.py`：通过 `remio --cn` CLI 重放 aApp 所用的同一组 syscall（rag / headless_fetch_content / run_prompt），真实捕获知识库问答（带引用）与竞品实采（真实无头浏览器抓取）输出。
 - `demo_api_transcript.md`：自动生成的演示实录，可作为演示证据直接提交（亦可后续转视频）。
-- `demo_video.mp4`：由实录渲染的演示视频（PIL + ffmpeg，约 6 分钟），`scripts/make_demo_video.py` 可重生成。
-- `demo_video_narrated.mp4`：含离线中文配音的精简宣传版（约 1 分 45 秒），`scripts/make_narrated_video.py` 生成（Windows Speech TTS，无需联网）。
+- `demo_video.mp4`：由实录渲染的演示视频（PIL + ffmpeg，约 3 分钟，完整展示真实抓取数据），`scripts/make_demo_video.py` 可重生成。
+- `demo_video_narrated.mp4`：含离线中文配音的演示版（约 3 分 40 秒，逐页展示真实竞品价格/评分/来源），`scripts/make_narrated_video.py` 生成（Windows Speech TTS，无需联网）。
 
 ## API 概览（节选）
 
