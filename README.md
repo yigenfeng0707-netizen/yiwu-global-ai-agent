@@ -100,7 +100,7 @@ npm run dev
 cp .env.example .env   # 填入 LLM_API_KEY
 docker compose up --build   # 启动 FastAPI 后端 :8000
 ```
-详见 `docs/演示脚本与录屏指南.md`、`docs/架构设计.md`、`docs/商业计划书.md`、`docs/金义新区落地方案.md`、`docs/路演PPT大纲.md`、`docs/自评与改进.md`。
+详见 `docs/演示脚本与录屏指南.md`、`docs/架构设计.md`、`docs/商业计划书.md`、`docs/金义新区落地方案.md`、`docs/路演一页纸.md`、`docs/30秒路演hook.md`、`docs/路演PPT大纲.md`、`docs/自评与改进.md`。
 
 ### Demo 实录（API 驱动，无需录屏）
 - `scripts/demo_capture.py`：通过 `remio --cn` CLI 重放 aApp 所用的同一组 syscall（rag / headless_fetch_content / run_prompt），真实捕获知识库问答（带引用）与竞品实采（真实无头浏览器抓取）输出。
@@ -110,6 +110,8 @@ docker compose up --build   # 启动 FastAPI 后端 :8000
 - `demo_video_short.mp4`：60 秒社媒短版（约 54 秒，片头 + 价格大字卡 + 竞品/选品要点 + 片尾），适合短视频平台传播。
 - `demo_video_autonomous.mp4`：端到端**自主闭环**演示（约 4 分 18 秒），Agent 接收单一目标后**自主决策**每一步调用哪个工具（决策卡可见），全程基于真实抓取数据，`scripts/make_autonomous_video.py` 生成。
 - 真实编排器 `scripts/autonomous_agent.py`：给定单一目标，由 **LLM 规划 + 规则兜底**自主决定下一步调用哪个 aApp 端点（rag / headless_fetch_content / run_prompt），并把上一步真实输出作为下一步上下文；产出 `demo_autonomous_live_transcript.md`（实时跑通，含 5 张决策卡）。视频即该编排器的可视化。
+- `demo_video_hook.mp4`：路演开场钩子视频（约 56 秒，开场口播 + 真实价格卡 + 收尾），适配路演/短视频，`scripts/make_hook_video.py` 生成；口播稿见 `docs/30秒路演hook.md`。
+- 现场 live 演示：双击 `run_live_demo.bat`（需 remio 桌面端在线）即实时跑通自主编排器。
 
 ## API 概览（节选）
 
