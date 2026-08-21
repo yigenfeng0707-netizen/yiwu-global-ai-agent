@@ -168,7 +168,7 @@ OUTRO = ('作品信息与落地承诺',
 
 
 def compose_music(path, dur):
-    """Compose a complete piano-style piece (I-V-vi-IV), fully offline via numpy."""
+    """Compose a complete piano piece — 《茉莉花》(Jasmine Flower) melody — offline via numpy."""
     sr = 22050
 
     def add_note(out, freq, start, length, vel=0.15):
@@ -189,28 +189,40 @@ def compose_music(path, dur):
         s0 = int(start * sr)
         out[s0:s0 + n] += w
 
-    # I - V - vi - IV  (C, G, Am, F)
-    chords = [
-        (261.63, 329.63, 392.00),
-        (196.00, 246.94, 293.66),
-        (220.00, 261.63, 329.63),
-        (174.61, 220.00, 261.63),
-    ]
+    freq = {'1': 261.63, '2': 293.66, '3': 329.63, '4': 349.23, '5': 392.00,
+            '6': 440.00, '7': 493.88, '1h': 523.25, '0': 0}
     beat = 0.5
-    bar = beat * 4
-    loop = np.zeros(int(sr * bar * len(chords)))
-    for bi, (r, th, fi) in enumerate(chords):
-        base = bi * bar
-        # sustained soft chord pad
+    # 《茉莉花》 numbered notation (jianpu), C major; '1h' = high do
+    melody = [
+        ('3', 1), ('3', 1), ('5', 1), ('6', 1), ('1h', 1.5), ('1', 0.5), ('6', 1), ('5', 1),
+        ('5', 1), ('6', 1), ('5', 1), ('3', 1), ('5', 1), ('6', 1), ('5', 1), ('3', 1), ('2', 1), ('3', 1),
+        ('3', 1), ('5', 1), ('3', 1), ('2', 1), ('1h', 1.5), ('2', 0.5), ('1', 1), ('6', 1),
+        ('5', 1), ('6', 1), ('1h', 1.5), ('1', 0.5), ('6', 1), ('5', 1),
+        ('3', 1), ('5', 1), ('3', 1), ('2', 1), ('1h', 1.5), ('2', 0.5), ('1', 1), ('6', 1),
+        ('5', 1), ('6', 1), ('5', 1), ('3', 1), ('5', 1), ('6', 1), ('5', 1), ('3', 1), ('2', 1), ('3', 1),
+        ('3', 1), ('5', 1), ('3', 1), ('2', 1), ('1h', 1.5), ('2', 0.5), ('1', 1), ('6', 1),
+        ('5', 1), ('6', 1), ('1h', 1.5), ('1', 0.5), ('6', 1), ('5', 1),
+    ]
+    chords = [(261.63, 329.63, 392.00), (196.00, 246.94, 293.66),
+              (220.00, 261.63, 329.63), (174.61, 220.00, 261.63)]
+    total_beats = sum(b for _, b in melody)
+    loop = np.zeros(int(sr * total_beats * beat))
+    # melody (piano)
+    pos = 0.0
+    for note, b in melody:
+        f = freq[note]
+        if f > 0:
+            add_note(loop, f, pos * beat, b * beat * 0.95, vel=0.20)
+        pos += b
+    # soft chord pad + bass, one bar per 4 beats
+    for bar in range(int(total_beats) // 4 + 1):
+        base = bar * 4 * beat
+        if base >= total_beats * beat:
+            break
+        r, th, fi = chords[bar % 4]
         for f in (r, th, fi):
-            add_note(loop, f, base, bar, vel=0.05)
-        # bass root (one octave down) on beat 1
-        add_note(loop, r / 2, base, beat * 1.8, vel=0.08)
-        # broken-chord melody (root, third, fifth, octave)
-        for ai, f in enumerate((r, th, fi, r * 2)):
-            add_note(loop, f, base + ai * beat, beat * 0.95, vel=0.17)
-        # a gentle top echo on the last beat
-        add_note(loop, fi * 2, base + 3 * beat, beat * 0.9, vel=0.10)
+            add_note(loop, f, base, 4 * beat, vel=0.035)
+        add_note(loop, r / 2, base, 4 * beat * 0.9, vel=0.06)
     loop /= (np.max(np.abs(loop)) + 1e-9)
     loop *= 0.6
     total = int(dur * sr)
@@ -363,6 +375,7 @@ def main():
         make_price_card(price, cap, rating).save(ip)
         if ci == 0:
             audio = spn_path
+            dur = wave_dur(spn_path) + 0.4  # match real narration length, never cut off
         else:
             wp = os.path.join(TMP, f'spn_sil_{ci}.wav')
             silence_wav(wp, 6.0)
