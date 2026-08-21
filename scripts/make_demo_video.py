@@ -91,6 +91,21 @@ def split_chunks(paragraphs):
     return chunks
 
 
+def make_card(lines, title=None, accent=True):
+    img = Image.new('RGB', (W, H), BG)
+    d = ImageDraw.Draw(img)
+    y = 80 if not title else 50
+    pad = 80
+    if title:
+        d.text((pad, y), title, font=load_font(34), fill=ACCENT)
+        y += 60
+    f = load_font(24)
+    for ln in lines:
+        d.text((pad, y), ln, font=f, fill=FG)
+        y += 38
+    return img
+
+
 def main():
     os.makedirs(SLIDES_DIR, exist_ok=True)
     md = open(TRANSCRIPT, encoding='utf-8').read()
@@ -104,6 +119,21 @@ def main():
         i += 2
         paras = [p.strip() for p in body.split('\n\n') if p.strip()]
         blocks.append((heading, paras))
+
+    intro = ('义乌小商品出海智能体-OPC', [
+        '金漪湖·论剑 2026 智能体 OPC 创新创业大赛 · OPC 智能体赛道',
+        '官方工具：remio 睿妙（知识库 + aApp）',
+        'aApp：义乌小商品出海助手  (yiwu-opc-assistant v3)',
+        '演示方式：remio API 真实调用实录（rag + 无头浏览器竞品实采）',
+        '生成时间：' + md.split('\n')[1].replace('_', '').strip(),
+    ])
+    outro = ('作品信息与落地承诺', [
+        'aApp 市场包：remio_aapp_market_prod/yiwu-opc-assistant/yiwu-opc-assistant-v3.zip',
+        '源码/GitHub：github.com/yigenfeng0707-netizen/yiwu-global-ai-agent',
+        '核心能力：智能体工具调用与自主性（真实网页自主抓取）',
+        '落地承诺：获奖后注册落地金义新区、入驻 OPC 社区、39 城复制',
+    ])
+    blocks = [intro] + blocks + [outro]
 
     paths = []
     idx = 0
@@ -127,6 +157,16 @@ def main():
     print('ffmpeg rc', r.returncode, r.stderr[-300:])
     if os.path.exists(OUT):
         print('WROTE', OUT, os.path.getsize(OUT), 'bytes')
+    # cleanup temp slides
+    for p in paths:
+        try:
+            os.remove(p)
+        except Exception:
+            pass
+    try:
+        os.rmdir(SLIDES_DIR)
+    except Exception:
+        pass
 
 
 if __name__ == '__main__':
