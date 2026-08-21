@@ -102,6 +102,10 @@ docker compose up --build   # 启动 FastAPI 后端 :8000
 ```
 详见 `docs/演示脚本与录屏指南.md`、`docs/架构设计.md`、`docs/商业计划书.md`、`docs/路演PPT大纲.md`、`docs/自评与改进.md`。
 
+### Demo 实录（API 驱动，无需录屏）
+- `scripts/demo_capture.py`：通过 `remio --cn` CLI 重放 aApp 所用的同一组 syscall（rag / headless_fetch_content / run_prompt），真实捕获知识库问答（带引用）与竞品实采（真实无头浏览器抓取）输出。
+- `demo_api_transcript.md`：自动生成的演示实录，可作为演示证据直接提交（亦可后续转视频）。
+
 ## API 概览（节选）
 
 | 分组 | 端点 | 方法 | 说明 |
