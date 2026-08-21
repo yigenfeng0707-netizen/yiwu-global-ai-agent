@@ -36,7 +36,7 @@ GOOD = (120, 220, 150)
 FONT_PATH = r'C:\Windows\Fonts\msyh.ttc'
 LINES_PER_SLIDE = 20
 EXTRA_PAGE_SEC = 4.2
-BGM_VOL = 0.10
+BGM_VOL = 0.09
 
 
 def load_font(size):
@@ -129,20 +129,28 @@ def extract_prices():
     j = md.find('## 3) /select')
     seg = md[i:j] if i >= 0 and j > i else md
     found = []
-    for m in re.finditer(r'\$([0-9]+(?:\.[0-9]{2})?)', seg):
-        line_start = seg.rfind('\n', 0, m.start()) + 1
-        line = seg[line_start:seg.find('\n', m.start())].strip()
-        price = '$' + m.group(1)
-        rating = None
-        rm = re.search(r'([0-9.]+)\s*星|([0-9.]+)\s*out of 5', line)
-        if rm:
-            rating = rm.group(1) or rm.group(2)
-        cap = re.sub(r'\s+', ' ', line)
-        cap = cap[:34]
-        if price not in [f[0] for f in found]:
-            found.append((price, cap, rating))
-        if len(found) >= 3:
-            break
+
+    def grab(pattern):
+        for m in re.finditer(pattern, seg):
+            line_start = seg.rfind('\n', 0, m.start()) + 1
+            line = seg[line_start:seg.find('\n', m.start())].strip()
+            val = m.group(1).replace(',', '')
+            price = '$' + val
+            rating = None
+            rm = re.search(r'([0-9.]+)\s*星|([0-9.]+)\s*out of 5', line)
+            if rm:
+                rating = rm.group(1) or rm.group(2)
+            cap = re.sub(r'\s+', ' ', line)
+            cap = cap[:34]
+            if price not in [f[0] for f in found]:
+                found.append((price, cap, rating))
+            if len(found) >= 3:
+                return
+
+    # prefer dotted retail prices (e.g. 16.99); fall back to integer amounts
+    grab(r'\$([0-9,]+\.[0-9]{1,2})')
+    if len(found) < 3:
+        grab(r'\$([0-9,]{3,})')
     return found
 
 
@@ -160,48 +168,51 @@ OUTRO = ('作品信息与落地承诺',
 
 
 def compose_music(path, dur):
-    """Compose a gentle 4-chord (I-V-vi-IV) loop with arpeggio, fully offline."""
+    """Compose a complete piano-style piece (I-V-vi-IV), fully offline via numpy."""
     sr = 22050
+
+    def add_note(out, freq, start, length, vel=0.15):
+        if freq <= 0:
+            return
+        n = int(sr * length)
+        if n <= 0:
+            return
+        t = np.linspace(0, length, n, endpoint=False)
+        env = np.exp(-t / (length * 0.32))
+        a = int(0.004 * sr)
+        if a < n:
+            env[:a] = np.linspace(0, 1, a)
+        w = np.zeros(n)
+        for h, amp in [(1, 1.0), (2, 0.5), (3, 0.22), (4, 0.1), (5, 0.05)]:
+            w += amp * np.sin(2 * np.pi * freq * h * t)
+        w = w / (np.max(np.abs(w)) + 1e-9) * env * vel
+        s0 = int(start * sr)
+        out[s0:s0 + n] += w
+
+    # I - V - vi - IV  (C, G, Am, F)
     chords = [
-        [261.63, 329.63, 392.00],   # C major
-        [196.00, 246.94, 293.66],   # G major
-        [220.00, 261.63, 329.63],   # A minor
-        [174.61, 220.00, 261.63],   # F major
+        (261.63, 329.63, 392.00),
+        (196.00, 246.94, 293.66),
+        (220.00, 261.63, 329.63),
+        (174.61, 220.00, 261.63),
     ]
-    arps = [
-        [523.25, 659.25, 783.99, 1046.50],
-        [392.00, 493.88, 587.33, 783.99],
-        [440.00, 523.25, 659.25, 880.00],
-        [349.23, 440.00, 523.25, 698.46],
-    ]
-
-    def tone(freq, d, harm=0.22):
-        t = np.linspace(0, d, int(sr * d), endpoint=False)
-        a = int(0.02 * sr)
-        r = int(0.25 * sr)
-        env = np.ones_like(t)
-        env[:a] = np.linspace(0, 1, a)
-        env[-r:] = np.linspace(1, 0, r)
-        w = np.sin(2 * np.pi * freq * t) + harm * np.sin(2 * np.pi * 2 * freq * t)
-        return w * env
-
-    bar = 2.0
+    beat = 0.5
+    bar = beat * 4
     loop = np.zeros(int(sr * bar * len(chords)))
-    for bi in range(len(chords)):
-        chord = np.zeros(int(sr * bar))
-        for f in chords[bi]:
-            chord += tone(f, bar, harm=0.15) * 0.16
-        notes = arps[bi]
-        step = bar / len(notes)
-        for ai, f in enumerate(notes):
-            seg = tone(f, step, harm=0.12) * 0.20
-            s0 = int(ai * step * sr)
-            chord[s0:s0 + len(seg)] += seg
-        chord_full = np.zeros_like(loop)
-        chord_full[bi * int(sr * bar):(bi + 1) * int(sr * bar)] = chord
-        loop += chord_full
+    for bi, (r, th, fi) in enumerate(chords):
+        base = bi * bar
+        # sustained soft chord pad
+        for f in (r, th, fi):
+            add_note(loop, f, base, bar, vel=0.05)
+        # bass root (one octave down) on beat 1
+        add_note(loop, r / 2, base, beat * 1.8, vel=0.08)
+        # broken-chord melody (root, third, fifth, octave)
+        for ai, f in enumerate((r, th, fi, r * 2)):
+            add_note(loop, f, base + ai * beat, beat * 0.95, vel=0.17)
+        # a gentle top echo on the last beat
+        add_note(loop, fi * 2, base + 3 * beat, beat * 0.9, vel=0.10)
     loop /= (np.max(np.abs(loop)) + 1e-9)
-    loop *= 0.55
+    loop *= 0.6
     total = int(dur * sr)
     full = np.tile(loop, total // len(loop) + 1)[:total]
     sf.write(path, full.astype(np.float32), sr)
@@ -253,14 +264,15 @@ def main():
     for s in sections:
         narr_texts.append(('sec', s[2]))
     prices = extract_prices()
-    price_narrs = []
+    price_parts = []
     for price, cap, rating in prices:
-        txt = '以沃尔玛为例，该品类真实售价 %s 美元' % price
+        p = price.lstrip('$')
+        s = '售价 %s 美元' % p
         if rating:
-            txt += '，评分 %s 星' % rating
-        txt += '，印证义乌供应链的价格优势。'
-        price_narrs.append(txt)
-        narr_texts.append(('price', txt))
+            s += '，评分 %s 星' % rating
+        price_parts.append(s)
+    price_narration = '我们来看真实抓取的数据：' + '；'.join(price_parts) + '。这些真实价格，正是义乌供应链出海的底气。'
+    narr_texts.append(('price', price_narration))
     tj = os.path.join(TMP, 'texts.json')
     json.dump([t for _, t in narr_texts], open(tj, 'w', encoding='utf-8'), ensure_ascii=False)
     ps1 = os.path.join(TMP, 'tts.ps1')
@@ -305,13 +317,18 @@ def main():
                 dur = EXTRA_PAGE_SEC
                 audio = wp
             frames.append((ip, audio, dur, pi == 0 and si == 0))
-        # insert price cards right after competitor section
+        # insert price cards right after competitor section (single narration on first card)
         if 'competitor' in title:
             for ci, (price, cap, rating) in enumerate(prices):
                 ip = os.path.join(TMP, f'pc_{ci}.png')
                 make_price_card(price, cap, rating).save(ip)
-                wp = tts_wav(ni); ni += 1
-                dur = wave_dur(wp) + 0.4
+                if ci == 0:
+                    wp = tts_wav(ni); ni += 1
+                    dur = wave_dur(wp) + 0.4
+                else:
+                    wp = os.path.join(TMP, f'sil_pc_{ci}.wav')
+                    silence_wav(wp, EXTRA_PAGE_SEC)
+                    dur = EXTRA_PAGE_SEC
                 frames.append((ip, wp, dur, False))
 
     clips = []
@@ -339,13 +356,18 @@ def main():
     make_slide([INTRO[1]], title=INTRO[0]).save(ip0)
     wp0 = tts_wav(0)
     short_frames.append((ip0, wp0, min(wave_dur(wp0) + 0.6, 9), True))
-    # price cards (first 3)
+    # price cards (first 3) — single narration on first card (no repetition)
+    spn_path = os.path.join(TMP, 'spn_0.wav')
     for ci, (price, cap, rating) in enumerate(prices):
         ip = os.path.join(TMP, f'sp_{ci}.png')
         make_price_card(price, cap, rating).save(ip)
-        wp = os.path.join(TMP, f'spn_{ci}.wav')
-        silence_wav(wp, 0.1)  # replaced by dedicated short TTS below
-        short_frames.append((ip, wp, 6.0, False))
+        if ci == 0:
+            audio = spn_path
+        else:
+            wp = os.path.join(TMP, f'spn_sil_{ci}.wav')
+            silence_wav(wp, 6.0)
+            audio = wp
+        short_frames.append((ip, audio, 6.0, False))
     # competitor first page (real data)
     csec = sections[2]
     cip = os.path.join(TMP, 'short_c.png')
@@ -364,10 +386,8 @@ def main():
     wpo = tts_wav(len(sections) - 1)
     short_frames.append((ipo, wpo, min(wave_dur(wpo) + 0.6, 9), False))
 
-    # regenerate short price narrations
-    short_price_texts = ['以沃尔玛为例，该品类真实售价 %s 美元%s，印证义乌供应链的价格优势。' % (
-        p, '，评分 %s 星' % r if r else '') for p, c, r in prices]
-    json.dump(short_price_texts, open(os.path.join(TMP, 'sp_texts.json'), 'w', encoding='utf-8'),
+    # generate the single short price narration (spn_0.wav)
+    json.dump([price_narration], open(os.path.join(TMP, 'sp_texts.json'), 'w', encoding='utf-8'),
               ensure_ascii=False)
     with open(os.path.join(TMP, 'sp_tts.ps1'), 'w', encoding='utf-8') as f:
         f.write(
