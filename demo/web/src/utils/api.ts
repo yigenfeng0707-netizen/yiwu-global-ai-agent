@@ -230,10 +230,10 @@ export async function fetchFAQ(category: string, language: string = 'zh'): Promi
   }
 }
 
-// 全链路工作流
+// 全链路工作流（多Agent+真实LLM，耗时较长）
 export async function runPipeline(req: { category: string; region: string; budget: string; target_country: string; platform: string; target_language: string }): Promise<PipelineResult> {
   try {
-    return await apiFetch('/pipeline', { method: 'POST', body: JSON.stringify(req) });
+    return await apiFetch('/pipeline', { method: 'POST', body: JSON.stringify(req), timeout: 120000 });
   } catch {
     return mockPipeline();
   }
