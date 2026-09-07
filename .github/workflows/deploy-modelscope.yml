@@ -104,15 +104,19 @@ jobs:
         run: |
           upsert() { # $1=kind $2=key $3=value
             local ep="https://modelscope.cn/openapi/v1/studios/${MS_OWNER}/${MS_REPO}/$1"
+            # 用 jq 构造请求体：value 可能本身是 JSON（如 LLM_REQUEST_EXTRAS），字符串拼接会破坏嵌套引号
+            local body=$(jq -n --arg k "$2" --arg v "$3" '{key:$k, value:$v}')
             local code=$(curl -s -o /tmp/upsert.json -w "%{http_code}" -X POST "$ep" \
               -H "Authorization: Bearer $MODELSCOPE_API_KEY" -H "Content-Type: application/json" \
-              -d "{\"key\":\"$2\",\"value\":\"$3\"}")
-            if [ "$code" = "400" ]; then
+              -d "$body")
+            # 已存在：400（旧版）或 409 DuplicateEntity（新版），均转 PUT 更新
+            if [ "$code" = "400" ] || [ "$code" = "409" ]; then
               code=$(curl -s -o /tmp/upsert.json -w "%{http_code}" -X PUT "$ep" \
                 -H "Authorization: Bearer $MODELSCOPE_API_KEY" -H "Content-Type: application/json" \
-                -d "{\"key\":\"$2\",\"value\":\"$3\"}")
+                -d "$body")
             fi
             echo "sync $1/$2: HTTP $code"
+            case "$code" in 2*) ;; *) echo "::warning::$1/$2 同步失败 (HTTP $code)：$(cat /tmp/upsert.json | head -c 200)" ;; esac
           }
           # 数据库持久化到魔搭持久目录（容器重启不丢数据）
           upsert variables DATABASE_PATH "/mnt/workspace/data/app.db"
