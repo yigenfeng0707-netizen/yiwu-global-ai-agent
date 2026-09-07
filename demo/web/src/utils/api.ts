@@ -131,7 +131,7 @@ export interface PolicyCaseData {
 // ==================== API 函数 ====================
 
 async function apiFetch<T>(url: string, options?: RequestInit & { timeout?: number }): Promise<T> {
-  const timeoutMs = options?.timeout || 10000;
+  const timeoutMs = options?.timeout || 20000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -215,7 +215,7 @@ export async function calculateTariff(req: { category: string; target_country: s
 // 智能客服
 export async function sendChatMessage(req: { message: string; category: string; language: string; session_id: string }): Promise<ChatResponseData> {
   try {
-    return await apiFetch('/customer-service/chat', { method: 'POST', body: JSON.stringify(req), timeout: 5000 });
+    return await apiFetch('/customer-service/chat', { method: 'POST', body: JSON.stringify(req), timeout: 45000 });
   } catch {
     return mockChatReply(req.message);
   }

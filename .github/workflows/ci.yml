@@ -36,8 +36,7 @@ jobs:
 
       - name: Run Python unit tests
         run: |
-          pip install pytest
-          python -m pytest tests/ --tb=short -q || echo "No tests directory yet, skipping"
+          python -m pytest tests/ --tb=short -q -v
 
   frontend-check:
     name: Frontend Check

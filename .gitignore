@@ -74,3 +74,16 @@ build/
 *.bak
 *.cache
 .trae/
+
+# ========================
+# Database & Test
+# ========================
+data/*.db
+data/*.db-wal
+data/*.db-shm
+.pytest_cache/
+htmlcov/
+.coverage
+
+.tmp_*.json
+demo/data/app.db

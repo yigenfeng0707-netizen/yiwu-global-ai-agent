@@ -19,6 +19,7 @@ from ..models.schemas import (
 )
 from ..services.auth import auth_service
 from ..services.llm import llm_service
+from ..cache import cache
 
 router = APIRouter()
 
@@ -285,4 +286,36 @@ async def get_status():
         },
         "llm_usage": llm_service.daily_usage,
         "data_sources": len(data_manager.list_sources()),
+        "cache": cache.stats,
     }
+
+
+# ==================== 系统监控 ====================
+
+@router.get("/stats/usage")
+async def get_usage_stats():
+    """API使用统计"""
+    from ..db.database import get_db
+    db = get_db()
+    return {
+        "api_usage": db.get_api_usage_stats(hours=24),
+        "auth": auth_service.get_stats(),
+        "chat_sessions": db.get_session_count(),
+        "cache": cache.stats,
+    }
+
+
+@router.get("/stats/history")
+async def get_query_history(limit: int = 20):
+    """查询历史"""
+    from ..db.database import get_db
+    db = get_db()
+    return {"history": db.get_query_history(limit=limit)}
+
+
+@router.get("/chat/history/{session_id}")
+async def get_chat_history(session_id: str, limit: int = 50):
+    """获取聊天会话历史"""
+    from ..db.database import get_db
+    db = get_db()
+    return {"session_id": session_id, "messages": db.get_chat_history(session_id, limit=limit)}

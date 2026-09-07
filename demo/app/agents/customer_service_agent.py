@@ -24,6 +24,7 @@ class CustomerServiceAgent(BaseAgent):
     )
 
     def __init__(self):
+        super().__init__()
         self.sessions: Dict[str, List[Dict]] = {}
 
     async def execute(self, **kwargs) -> Dict[str, Any]:
@@ -47,7 +48,20 @@ class CustomerServiceAgent(BaseAgent):
         # 是否需要转人工
         needs_human = dispute.get("detected", False) and emotion.get("type") == "negative"
 
-        # 记录会话
+        # 记录会话到数据库
+        try:
+            self._db.save_chat_message(
+                session_id=session_id, role="user", content=message,
+                emotion=emotion.get("type", ""), category=category, language=language,
+            )
+            self._db.save_chat_message(
+                session_id=session_id, role="bot", content=reply.get("text", ""),
+                category=category, language=language,
+            )
+        except Exception:
+            pass  # 数据库记录失败不影响主流程
+
+        # 内存会话也保留（向后兼容）
         if session_id not in self.sessions:
             self.sessions[session_id] = []
         self.sessions[session_id].append({"role": "user", "text": message})
@@ -132,9 +146,11 @@ class CustomerServiceAgent(BaseAgent):
         messages.append({"role": "user", "content": message})
 
         try:
+            # 25s：兼容推理模型截断重试（最多两次 LLM 调用）
+            # max_tokens=1600：推理模型思考占用预算，太小会截断空返回
             return await asyncio.wait_for(
-                llm_service.chat(messages, temperature=0.7, max_tokens=800),
-                timeout=8.0,
+                llm_service.chat(messages, temperature=0.7, max_tokens=1600),
+                timeout=25.0,
             )
         except (asyncio.TimeoutError, Exception):
             return None

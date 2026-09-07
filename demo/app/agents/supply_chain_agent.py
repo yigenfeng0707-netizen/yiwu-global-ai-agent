@@ -18,6 +18,7 @@ class SupplyChainAgent(BaseAgent):
     description = "供应链匹配Agent - 义乌小商品城供应商匹配、采购价格/MOQ/交期、义新欧班列物流、1039市场采购贸易"
 
     def __init__(self):
+        super().__init__()
         self.data_manager = DataSourceManager()
 
     async def execute(self, **kwargs) -> Dict[str, Any]:

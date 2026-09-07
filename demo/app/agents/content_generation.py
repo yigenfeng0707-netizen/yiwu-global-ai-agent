@@ -13,10 +13,15 @@ from ..data.content_data import (
 
 
 class ContentGenerationAgent(BaseAgent):
-    """内容生成Agent - 多语言内容生成、SEO优化、营销文案"""
+    """内容生成Agent - 多语言内容生成、SEO优化、营销文案，LLM增强"""
 
     name = "content_generation"
     description = "内容生成Agent - 多语言产品标题/描述/卖点/SEO/社媒/广告文案"
+
+    LLM_SYSTEM_PROMPT = (
+        "你是跨境电商内容营销专家，精通多语言产品标题、描述、SEO关键词优化、"
+        "社交媒体文案和广告素材撰写。内容要吸引海外买家，突出义乌直供优势。"
+    )
 
     # 品类翻译映射
     CATEGORY_TRANSLATIONS = {
@@ -49,7 +54,7 @@ class ContentGenerationAgent(BaseAgent):
         # 平台合规提示
         warnings = self._get_platform_warnings(category, platform)
 
-        return self._wrap_response({
+        result = self._wrap_response({
             "product_name": product_name,
             "category": category,
             "platform": platform,
@@ -68,6 +73,19 @@ class ContentGenerationAgent(BaseAgent):
                 "warnings": warnings,
             },
         })
+
+        # LLM增强：生成AI优化版标题和描述
+        if product_name:
+            llm_result = await self._llm_enhance_content(
+                product_name, category, platform, target_language,
+            )
+            if llm_result:
+                result["ai_enhanced"] = llm_result
+
+        # 记录查询
+        self.record_query({"product_name": product_name, "category": category, "platform": platform})
+
+        return result
 
     def _generate_title(self, product_name: str, category: str, platform: str, lang: str) -> str:
         """生成产品标题"""
@@ -133,3 +151,28 @@ class ContentGenerationAgent(BaseAgent):
             return name
         # 简单映射，实际应调用LLM翻译
         return name
+
+    async def _llm_enhance_content(self, product_name: str, category: str,
+                                    platform: str, lang: str) -> Optional[Dict[str, str]]:
+        """LLM增强内容生成 - 生成AI优化版标题和描述"""
+        from ..services.llm import llm_service
+        if not llm_service.api_key:
+            return None
+
+        prompt = (
+            f"为以下跨境电商产品生成优化内容：\n"
+            f"产品：{product_name}\n品类：{category}\n平台：{platform}\n目标语言：{lang}\n\n"
+            f"请返回JSON格式：{{\"optimized_title\": \"优化标题\", \"optimized_description\": \"优化描述(100字内)\", \"hashtags\": \"标签1 #标签2\"}}"
+        )
+        result = await self.llm_generate(prompt, temperature=0.7, max_tokens=500)
+        if result:
+            try:
+                import json
+                # 尝试解析JSON
+                cleaned = result.strip()
+                if cleaned.startswith("```"):
+                    cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+                return json.loads(cleaned)
+            except Exception:
+                return {"optimized_title": result[:200]}
+        return None

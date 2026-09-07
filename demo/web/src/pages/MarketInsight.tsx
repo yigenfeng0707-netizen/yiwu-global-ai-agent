@@ -4,9 +4,10 @@ import { motion } from 'framer-motion';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
-import { TrendingUp, AlertTriangle, Star, Shield, ChevronDown, Loader2 } from 'lucide-react';
+import { TrendingUp, AlertTriangle, Star, Shield, ChevronDown, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { useStore, categories } from '@/store/useStore';
 import { fetchMarketInsight, type MarketInsightData } from '@/utils/api';
+import { useApi } from '@/hooks/useApi';
 
 const regions = ['欧洲（义新欧班列直达）', '中亚', '中东', '东南亚', '非洲', '南美'];
 
@@ -20,8 +21,6 @@ const riskColor: Record<string, string> = {
 export default function MarketInsight() {
   const [searchParams] = useSearchParams();
   const { selectedCategory, setSelectedCategory, targetMarket, setTargetMarket } = useStore();
-  const [data, setData] = useState<MarketInsightData | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const urlCategory = searchParams.get('category');
   const category = urlCategory || selectedCategory;
@@ -32,19 +31,28 @@ export default function MarketInsight() {
     }
   }, [urlCategory, selectedCategory, setSelectedCategory]);
 
-  useEffect(() => {
-    setLoading(true);
-    fetchMarketInsight(category, targetMarket)
-      .then(setData)
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
-  }, [category, targetMarket]);
+  const { data, loading, error, retry } = useApi<MarketInsightData>(
+    () => fetchMarketInsight(category, targetMarket),
+    [category, targetMarket],
+  );
 
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-yiwu-500" />
         <span className="ml-3 text-gray-400">正在加载市场数据...</span>
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="flex h-96 flex-col items-center justify-center gap-4">
+        <AlertTriangle className="h-10 w-10 text-red-400" />
+        <p className="text-gray-400">加载失败: {error}</p>
+        <button onClick={retry} className="flex items-center gap-2 rounded-lg bg-yiwu-500/20 px-4 py-2 text-sm text-yiwu-400 hover:bg-yiwu-500/30 transition">
+          <RefreshCw size={14} /> 重试
+        </button>
       </div>
     );
   }
@@ -241,6 +249,18 @@ export default function MarketInsight() {
       <div className="text-xs text-gray-600 text-center">
         数据来源: {data.data_sources?.join(' · ')}
       </div>
+
+      {/* AI Insight */}
+      {(data as MarketInsightData & { ai_insight?: string }).ai_insight && (
+        <div className="glass-light rounded-xl p-6 border border-yiwu-500/20">
+          <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+            <Sparkles size={16} className="text-yiwu-400" /> AI 商业洞察
+          </h3>
+          <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">
+            {(data as MarketInsightData & { ai_insight?: string }).ai_insight}
+          </p>
+        </div>
+      )}
     </motion.div>
   );
 }

@@ -9,12 +9,18 @@ from ..data.sources import DataSourceManager
 
 
 class MarketInsightAgent(BaseAgent):
-    """市场洞察Agent - 基于义乌指数和市场数据"""
+    """市场洞察Agent - 基于义乌指数和市场数据，LLM增强洞察"""
 
     name = "market_insight"
     description = "市场洞察Agent - 义乌指数、市场规模、趋势分析、竞争格局"
 
+    LLM_SYSTEM_PROMPT = (
+        "你是义乌小商品城市场分析师，专精全球市场趋势分析、义乌指数解读、"
+        "跨境电商市场洞察。给出简洁专业的商业建议。"
+    )
+
     def __init__(self):
+        super().__init__()
         self.data_manager = DataSourceManager()
 
     async def execute(self, **kwargs) -> Dict[str, Any]:
@@ -57,7 +63,7 @@ class MarketInsightAgent(BaseAgent):
         data_sources = self.data_manager.fetch_all(category, region)
         source_names = [s.get("source", "") for s in data_sources]
 
-        return self._wrap_response({
+        result = self._wrap_response({
             "category": category,
             "region": region,
             "market_size": market_size,
@@ -71,6 +77,16 @@ class MarketInsightAgent(BaseAgent):
             "yiwu_index": yiwu_index,
             "data_sources": source_names,
         })
+
+        # 记录查询
+        self.record_query({"category": category, "region": region})
+
+        # LLM增强：添加AI洞察
+        result = await self.llm_enhance(
+            result,
+            context=f"品类:{category}, 区域:{region}, 市场规模:{market_size}, 增长率:{market_growth}, 义乌指数:{yiwu_index['current']}",
+        )
+        return result
 
     def _get_hot_categories(self, category: str) -> List[Dict[str, Any]]:
         """获取热门品类"""

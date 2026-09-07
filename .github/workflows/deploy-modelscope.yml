@@ -89,6 +89,39 @@ jobs:
           fi
           git push -f modelscope HEAD:master
 
+      - name: Sync LLM env to ModelScope (secrets/variables)
+        # 平台侧 Secrets/Variables 是容器环境的唯一来源，git 里的 .env 不会生效
+        # 已存在返回 400 时改 PUT 更新
+        env:
+          MODELSCOPE_API_KEY: ${{ secrets.MODELSCOPE_API_KEY }}
+          MS_OWNER: ${{ vars.MS_OWNER || 'gsym236998' }}
+          MS_REPO: ${{ vars.MS_REPO_NAME || 'yiwu-global-ai-agent' }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://api.stepfun.com/step_plan/v1' }}
+          LLM_MODEL: ${{ vars.LLM_MODEL || 'step-3.7-flash' }}
+          LLM_REQUEST_EXTRAS: ${{ vars.LLM_REQUEST_EXTRAS || '{"reasoning_effort":"low"}' }}
+        run: |
+          if [ -z "$LLM_API_KEY" ]; then
+            echo "::warning::LLM_API_KEY secret 未配置，跳过同步（线上将无AI增强）"
+            exit 0
+          fi
+          upsert() { # $1=kind $2=key $3=value
+            local ep="https://modelscope.cn/openapi/v1/studios/${MS_OWNER}/${MS_REPO}/$1"
+            local code=$(curl -s -o /tmp/upsert.json -w "%{http_code}" -X POST "$ep" \
+              -H "Authorization: Bearer $MODELSCOPE_API_KEY" -H "Content-Type: application/json" \
+              -d "{\"key\":\"$2\",\"value\":\"$3\"}")
+            if [ "$code" = "400" ]; then
+              code=$(curl -s -o /tmp/upsert.json -w "%{http_code}" -X PUT "$ep" \
+                -H "Authorization: Bearer $MODELSCOPE_API_KEY" -H "Content-Type: application/json" \
+                -d "{\"key\":\"$2\",\"value\":\"$3\"}")
+            fi
+            echo "sync $1/$2: HTTP $code"
+          }
+          upsert secrets  LLM_API_KEY  "$LLM_API_KEY"
+          upsert variables LLM_BASE_URL "$LLM_BASE_URL"
+          upsert variables LLM_MODEL     "$LLM_MODEL"
+          upsert variables LLM_REQUEST_EXTRAS "$LLM_REQUEST_EXTRAS"
+
       - name: Deploy Studio (OpenAPI deploy 端点)
         env:
           MODELSCOPE_API_KEY: ${{ secrets.MODELSCOPE_API_KEY }}
@@ -118,3 +151,29 @@ jobs:
             sleep 30
           done
           echo "超时"; exit 1
+
+      - name: Smoke test (AI 生效性验证)
+        # 部署成功 ≠ 功能正常：断言 ai_insight 字段存在（仅 LLM 调用成功时才返回）
+        env:
+          MS_OWNER: ${{ vars.MS_OWNER || 'gsym236998' }}
+          MS_REPO: ${{ vars.MS_REPO_NAME || 'yiwu-global-ai-agent' }}
+        run: |
+          SERVICE_URL="https://${MS_OWNER}-${MS_REPO}.ms.show"
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120"
+          for i in $(seq 1 10); do
+            HEALTH=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 -A "$UA" "$SERVICE_URL/health" || true)
+            [ "$HEALTH" = "200" ] && break
+            echo "等待服务就绪 (health: $HEALTH) ..."
+            sleep 15
+          done
+          [ "$HEALTH" = "200" ] || { echo "::error::健康检查失败"; exit 1; }
+          curl -s --max-time 60 -A "$UA" \
+            "$SERVICE_URL/api/v1/market-insight?category=%E5%9C%A3%E8%AF%9E%E9%A5%B0%E5%93%81&region=europe" \
+            -o /tmp/mi.json
+          HAS_INSIGHT=$(jq -r 'has("ai_insight")' /tmp/mi.json 2>/dev/null || echo false)
+          echo "ai_insight present: $HAS_INSIGHT"
+          if [ "$HAS_INSIGHT" = "false" ]; then
+            echo "::warning::ai_insight 缺失，LLM 未生效（检查平台 Secrets 与网关余额）"
+            exit 1
+          fi
+          echo "冒烟测试通过：线上 AI 增强已生效"
