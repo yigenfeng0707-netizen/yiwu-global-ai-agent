@@ -96,6 +96,92 @@ class TestLLMService:
         assert "used" in usage
         assert "limit" in usage
 
+    def test_fallback_config_missing(self, monkeypatch):
+        """未配置备选模型时不启用降级"""
+        for var in ("LLM_FALLBACK_API_KEY", "LLM_FALLBACK_BASE_URL", "LLM_FALLBACK_MODEL"):
+            monkeypatch.delenv(var, raising=False)
+        service = LLMService()
+        assert service.fallback == {}
+
+    def test_fallback_config_complete(self, monkeypatch):
+        """三项都配置时启用备选模型"""
+        monkeypatch.setenv("LLM_FALLBACK_API_KEY", "fb-key")
+        monkeypatch.setenv("LLM_FALLBACK_BASE_URL", "https://fb.example.com/v1")
+        monkeypatch.setenv("LLM_FALLBACK_MODEL", "fb-model")
+        service = LLMService()
+        assert service.fallback["api_key"] == "fb-key"
+        assert service.fallback["base_url"] == "https://fb.example.com/v1"
+        assert service.fallback["model"] == "fb-model"
+
+    @pytest.mark.asyncio
+    async def test_fallback_switch_on_primary_failure(self, monkeypatch, tmp_path):
+        """主模型请求失败时自动切换备选模型"""
+        monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "app.db"))
+        monkeypatch.setenv("LLM_FALLBACK_API_KEY", "fb-key")
+        monkeypatch.setenv("LLM_FALLBACK_BASE_URL", "https://fb.example.com/v1")
+        monkeypatch.setenv("LLM_FALLBACK_MODEL", "fb-model")
+        service = LLMService()
+        service.api_key = "primary-key"
+
+        calls = []
+
+        async def fake_request(messages, temperature, max_tokens, *, base_url=None,
+                               api_key=None, model=None, request_extras=None):
+            calls.append({"base_url": base_url, "model": model})
+            if base_url is None or base_url == service.base_url:
+                return None, None  # 主模型失败
+            return "备选模型回复", "stop"
+
+        monkeypatch.setattr(service, "_request", fake_request)
+        result = await service.chat([{"role": "user", "content": "hi"}])
+        assert result == "备选模型回复"
+        assert len(calls) == 2
+        assert calls[1]["model"] == "fb-model"
+
+    def test_fallback_cooldown_after_failures(self, monkeypatch, tmp_path):
+        """备选模型连续失败3次后熔断冷却10分钟"""
+        monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "app.db"))
+        monkeypatch.setenv("LLM_FALLBACK_API_KEY", "fb-key")
+        monkeypatch.setenv("LLM_FALLBACK_BASE_URL", "https://fb.example.com/v1")
+        monkeypatch.setenv("LLM_FALLBACK_MODEL", "fb-model")
+        service = LLMService()
+
+        def always_fail(messages, temperature, max_tokens, **kwargs):
+            return None, None
+
+        monkeypatch.setattr(service, "_request_sync", always_fail)
+        # 连续3次备选失败，应触发熔断冷却
+        for _ in range(3):
+            assert service._chat_fallback_sync([{"role": "user", "content": "hi"}], 0.7, 300) is None
+        assert service._fallback_cooldown_until > time.time()
+        # 冷却期内不再发起备选请求
+        called = []
+        monkeypatch.setattr(service, "_request_sync",
+                            lambda m, t, k, **kw: called.append(1) or (None, None))
+        assert service._chat_fallback_sync([{"role": "user", "content": "hi"}], 0.7, 300) is None
+        assert called == []
+
+    def test_daily_count_persistence(self, monkeypatch, tmp_path):
+        """日计数落盘并在重启后恢复（同一天）"""
+        monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "app.db"))
+        service = LLMService()
+        service._increment_count()
+        service._increment_count()
+        assert service._daily_count == 2
+
+        # 模拟重启：新实例同一天恢复计数
+        service2 = LLMService()
+        assert service2._daily_count == 2
+
+        # 跨天则不恢复
+        import json
+        state_file = service2._count_file
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+        state["date"] = "2000-01-01"
+        state_file.write_text(json.dumps(state), encoding="utf-8")
+        service3 = LLMService()
+        assert service3._daily_count == 0
+
 
 # ==================== Pydantic模型 ====================
 

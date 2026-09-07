@@ -89,7 +89,7 @@ jobs:
           fi
           git push -f modelscope HEAD:master
 
-      - name: Sync LLM env to ModelScope (secrets/variables)
+      - name: Sync env to ModelScope (secrets/variables)
         # 平台侧 Secrets/Variables 是容器环境的唯一来源，git 里的 .env 不会生效
         # 已存在返回 400 时改 PUT 更新
         env:
@@ -100,11 +100,8 @@ jobs:
           LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://api.stepfun.com/step_plan/v1' }}
           LLM_MODEL: ${{ vars.LLM_MODEL || 'step-3.7-flash' }}
           LLM_REQUEST_EXTRAS: ${{ vars.LLM_REQUEST_EXTRAS || '{"reasoning_effort":"low"}' }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
-          if [ -z "$LLM_API_KEY" ]; then
-            echo "::warning::LLM_API_KEY secret 未配置，跳过同步（线上将无AI增强）"
-            exit 0
-          fi
           upsert() { # $1=kind $2=key $3=value
             local ep="https://modelscope.cn/openapi/v1/studios/${MS_OWNER}/${MS_REPO}/$1"
             local code=$(curl -s -o /tmp/upsert.json -w "%{http_code}" -X POST "$ep" \
@@ -117,6 +114,19 @@ jobs:
             fi
             echo "sync $1/$2: HTTP $code"
           }
+          # 数据库持久化到魔搭持久目录（容器重启不丢数据）
+          upsert variables DATABASE_PATH "/mnt/workspace/data/app.db"
+          # JWT 生产密钥（GitHub secret，未配置则用平台默认开发密钥）
+          if [ -n "$JWT_SECRET" ]; then
+            upsert secrets JWT_SECRET "$JWT_SECRET"
+          else
+            echo "::warning::JWT_SECRET secret 未配置，跳过同步（线上将使用开发默认密钥）"
+          fi
+          # LLM 配置（未配置密钥则跳过，线上无 AI 增强）
+          if [ -z "$LLM_API_KEY" ]; then
+            echo "::warning::LLM_API_KEY secret 未配置，跳过同步（线上将无AI增强）"
+            exit 0
+          fi
           upsert secrets  LLM_API_KEY  "$LLM_API_KEY"
           upsert variables LLM_BASE_URL "$LLM_BASE_URL"
           upsert variables LLM_MODEL     "$LLM_MODEL"

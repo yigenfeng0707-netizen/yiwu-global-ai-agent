@@ -6,6 +6,7 @@ import {
   mockFAQ, mockPipeline, mockPolicyCities, mockPolicyGuide,
   mockPolicyBenefit, mockPolicyCases,
 } from './mockData';
+import { withSource } from '@/store/useDataSource';
 
 // ==================== 类型定义 ====================
 
@@ -151,136 +152,123 @@ async function apiFetch<T>(url: string, options?: RequestInit & { timeout?: numb
 
 // 市场洞察
 export async function fetchMarketInsight(category: string, region: string): Promise<MarketInsightData> {
-  try {
-    return await apiFetch(`/market-insight?category=${encodeURIComponent(category)}&region=${encodeURIComponent(region)}`);
-  } catch {
-    return mockMarketInsight(category, region);
-  }
+  return withSource(
+    apiFetch<MarketInsightData>(`/market-insight?category=${encodeURIComponent(category)}&region=${encodeURIComponent(region)}`),
+    () => mockMarketInsight(category, region),
+  );
 }
 
 // 智能选品
 export async function fetchSmartSelection(category: string, budget: string, region: string): Promise<SmartSelectionData> {
-  try {
-    return await apiFetch(`/smart-selection?category=${encodeURIComponent(category)}&budget=${encodeURIComponent(budget)}&region=${encodeURIComponent(region)}`);
-  } catch {
-    return mockSmartSelection(category, budget, region);
-  }
+  return withSource(
+    apiFetch<SmartSelectionData>(`/smart-selection?category=${encodeURIComponent(category)}&budget=${encodeURIComponent(budget)}&region=${encodeURIComponent(region)}`),
+    () => mockSmartSelection(category, budget, region),
+  );
 }
 
 // 供应链匹配
 export async function fetchSupplyChain(category: string, region: string, budget: string): Promise<SupplyChainData> {
-  try {
-    return await apiFetch(`/supply-chain/${encodeURIComponent(category)}?region=${encodeURIComponent(region)}&budget=${encodeURIComponent(budget)}`);
-  } catch {
-    return mockSupplyChain(category, region, budget);
-  }
+  return withSource(
+    apiFetch<SupplyChainData>(`/supply-chain/${encodeURIComponent(category)}?region=${encodeURIComponent(region)}&budget=${encodeURIComponent(budget)}`),
+    () => mockSupplyChain(category, region, budget),
+  );
 }
 
 // 义新欧班列物流
 export async function fetchYixinouLogistics(region: string = ''): Promise<LogisticsData> {
-  try {
-    return await apiFetch(`/logistics/yixinou?region=${encodeURIComponent(region)}`);
-  } catch {
-    return mockLogistics();
-  }
+  return withSource(
+    apiFetch<LogisticsData>(`/logistics/yixinou?region=${encodeURIComponent(region)}`),
+    () => mockLogistics(),
+  );
 }
 
 // 内容生成
 export async function generateContent(req: { product_name: string; category: string; platform: string; target_language: string }): Promise<ContentGenerationData> {
-  try {
-    return await apiFetch('/content/generate', { method: 'POST', body: JSON.stringify(req) });
-  } catch {
-    return mockContentGeneration(req.product_name, req.category, req.platform, req.target_language);
-  }
+  return withSource(
+    apiFetch<ContentGenerationData>('/content/generate', { method: 'POST', body: JSON.stringify(req) }),
+    () => mockContentGeneration(req.product_name, req.category, req.platform, req.target_language),
+  );
 }
 
 // 合规查询
 export async function fetchComplianceCheck(category: string, target_country: string): Promise<ComplianceData> {
-  try {
-    return await apiFetch(`/compliance?category=${encodeURIComponent(category)}&target_country=${encodeURIComponent(target_country)}`);
-  } catch {
-    return mockCompliance(category, target_country);
-  }
+  return withSource(
+    apiFetch<ComplianceData>(`/compliance?category=${encodeURIComponent(category)}&target_country=${encodeURIComponent(target_country)}`),
+    () => mockCompliance(category, target_country),
+  );
 }
 
 // 关税计算
 export async function calculateTariff(req: { category: string; target_country: string; product_value: number }) {
-  try {
-    return await apiFetch('/tariff/calculate', { method: 'POST', body: JSON.stringify(req) });
-  } catch {
-    return mockTariff(req.product_value);
-  }
+  return withSource(
+    apiFetch('/tariff/calculate', { method: 'POST', body: JSON.stringify(req) }),
+    () => mockTariff(req.product_value),
+  );
 }
 
 // 智能客服
 export async function sendChatMessage(req: { message: string; category: string; language: string; session_id: string }): Promise<ChatResponseData> {
-  try {
-    return await apiFetch('/customer-service/chat', { method: 'POST', body: JSON.stringify(req), timeout: 45000 });
-  } catch {
-    return mockChatReply(req.message);
-  }
+  return withSource(
+    apiFetch<ChatResponseData>('/customer-service/chat', { method: 'POST', body: JSON.stringify(req), timeout: 45000 }),
+    () => mockChatReply(req.message),
+  );
 }
 
 // FAQ
 export async function fetchFAQ(category: string, language: string = 'zh'): Promise<FAQResponseData> {
-  try {
-    return await apiFetch(`/customer-service/faq?category=${encodeURIComponent(category)}&language=${language}`);
-  } catch {
-    return mockFAQ(category, language);
-  }
+  return withSource(
+    apiFetch<FAQResponseData>(`/customer-service/faq?category=${encodeURIComponent(category)}&language=${language}`),
+    () => mockFAQ(category, language),
+  );
 }
 
 // 全链路工作流（多Agent+真实LLM，耗时较长）
 export async function runPipeline(req: { category: string; region: string; budget: string; target_country: string; platform: string; target_language: string }): Promise<PipelineResult> {
-  try {
-    return await apiFetch('/pipeline', { method: 'POST', body: JSON.stringify(req), timeout: 120000 });
-  } catch {
-    return mockPipeline();
-  }
+  return withSource(
+    apiFetch<PipelineResult>('/pipeline', { method: 'POST', body: JSON.stringify(req), timeout: 120000 }),
+    () => mockPipeline(),
+  );
 }
 
 // 政策复制 - 39城列表
 export async function fetchPolicyCities(): Promise<PolicyCitiesResponse> {
-  try {
-    return await apiFetch('/policy-replication/cities');
-  } catch {
-    return mockPolicyCities();
-  }
+  return withSource(
+    apiFetch<PolicyCitiesResponse>('/policy-replication/cities'),
+    () => mockPolicyCities(),
+  );
 }
 
 // 政策复制 - 单个城市信息
 export async function fetchPolicyCity(cityName: string): Promise<unknown> {
-  try {
-    return await apiFetch(`/policy-replication/city/${encodeURIComponent(cityName)}`);
-  } catch {
-    const cities = mockPolicyCities().cities;
-    return cities.find(c => c.city === cityName) || cities[0];
-  }
+  return withSource(
+    apiFetch(`/policy-replication/city/${encodeURIComponent(cityName)}`),
+    () => {
+      const cities = mockPolicyCities().cities;
+      return cities.find(c => c.city === cityName) || cities[0];
+    },
+  );
 }
 
 // 政策复制 - 1039政策解读
 export async function fetchPolicyGuide(): Promise<PolicyGuideData> {
-  try {
-    return await apiFetch('/policy-replication/policy-guide');
-  } catch {
-    return mockPolicyGuide();
-  }
+  return withSource(
+    apiFetch<PolicyGuideData>('/policy-replication/policy-guide'),
+    () => mockPolicyGuide(),
+  );
 }
 
 // 政策复制 - 政策红利计算
 export async function calculatePolicyBenefit(req: { annual_export: number; category: string; city: string }): Promise<PolicyBenefitData> {
-  try {
-    return await apiFetch('/policy-replication/calculate-benefit', { method: 'POST', body: JSON.stringify(req) });
-  } catch {
-    return mockPolicyBenefit(req.annual_export, req.category, req.city);
-  }
+  return withSource(
+    apiFetch<PolicyBenefitData>('/policy-replication/calculate-benefit', { method: 'POST', body: JSON.stringify(req) }),
+    () => mockPolicyBenefit(req.annual_export, req.category, req.city),
+  );
 }
 
 // 政策复制 - 义乌成功案例
 export async function fetchPolicyCases(): Promise<{ cases: PolicyCaseData[] }> {
-  try {
-    return await apiFetch('/policy-replication/cases');
-  } catch {
-    return mockPolicyCases();
-  }
+  return withSource(
+    apiFetch<{ cases: PolicyCaseData[] }>('/policy-replication/cases'),
+    () => mockPolicyCases(),
+  );
 }

@@ -6,6 +6,7 @@ import {
   Train, Database, Building2,
 } from 'lucide-react';
 import { useStore } from '@/store/useStore';
+import DataSourceBadge from '@/components/DataSourceBadge';
 
 const navItems = [
   { label: '首页', icon: Home, path: '/' },
@@ -136,7 +137,8 @@ export default function Layout() {
             </button>
             <span className="text-sm text-gray-400">义乌国际商贸城 · 小商品跨境出海智能助手</span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
+          <div className="flex items-center gap-3 text-xs text-gray-500">
+            <DataSourceBadge />
             <span className="hidden sm:inline">7 Agents 在线</span>
             <span className="h-2 w-2 rounded-full bg-yiwu-500" />
           </div>

@@ -1,5 +1,6 @@
 """义乌小商品出海智能体 - 认证服务（数据库持久化版）"""
 
+import logging
 import os
 import time
 import hashlib
@@ -9,6 +10,8 @@ from typing import Optional, Dict, Any
 import jwt
 
 from ..db.database import get_db
+
+logger = logging.getLogger(__name__)
 
 
 def _hash_password(password: str, salt: str = "yiwu-chuhai") -> str:
@@ -20,7 +23,10 @@ class AuthService:
     """JWT认证服务 - SQLite持久化"""
 
     def __init__(self):
-        self.secret = os.getenv("JWT_SECRET", "yiwu-chuhai-dev-secret-key")
+        self.secret = os.getenv("JWT_SECRET", "")
+        if not self.secret:
+            logger.warning("JWT_SECRET 未配置，使用开发默认密钥（仅限本地开发，生产须注入环境变量）")
+            self.secret = "yiwu-chuhai-dev-secret-key"
         self.algorithm = "HS256"
         self.expire_hours = 24
         self.db = get_db()
