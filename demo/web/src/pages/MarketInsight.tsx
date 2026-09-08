@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
-import { TrendingUp, AlertTriangle, Star, Shield, ChevronDown, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { TrendingUp, AlertTriangle, Star, Shield, ChevronDown, Loader2, RefreshCw, Sparkles, BadgeCheck, ExternalLink, Coins } from 'lucide-react';
 import { useStore, categories } from '@/store/useStore';
 import { fetchMarketInsight, type MarketInsightData } from '@/utils/api';
 import { useApi } from '@/hooks/useApi';
@@ -93,21 +93,99 @@ export default function MarketInsight() {
         </div>
       </div>
 
-      {/* 义乌指数 */}
+      {/* 义乌指数（P1-1：官方发布真实值 + 实时汇率 + 演示基准，三态诚实标注） */}
       {data.yiwu_index && (
-        <div className="glass-light rounded-xl p-6">
+        <div className="glass-light rounded-xl p-6 space-y-4">
+          {/* 标题 + 真伪徽章 */}
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-400 mb-1">义乌指数 · {data.category}</p>
-              <p className="text-xl font-bold text-white">{data.yiwu_index.current}</p>
+            <p className="text-sm text-gray-400">义乌指数 · {data.category}</p>
+            {data.yiwu_index.is_real ? (
+              <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400">
+                <BadgeCheck size={14} /> 官方发布值 · 真实数据
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 rounded-full bg-gray-500/10 px-3 py-1 text-xs font-medium text-gray-400">
+                演示基准值
+              </span>
+            )}
+          </div>
+
+          {/* 官方发布真实值 */}
+          {data.yiwu_index.official?.is_real && data.yiwu_index.official.index_value != null && (
+            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">
+                    官方发布值 · {data.yiwu_index.official.category_matched || data.category}
+                    {data.yiwu_index.official.as_of ? ` · ${data.yiwu_index.official.as_of}` : ''}
+                  </p>
+                  <div className="flex items-end gap-3">
+                    <span className="text-3xl font-bold text-white">{data.yiwu_index.official.index_value}</span>
+                    <span className="rounded bg-white/5 px-2 py-0.5 text-xs text-gray-400">
+                      {data.yiwu_index.official.scale || '官方千点基准'}
+                    </span>
+                    {data.yiwu_index.official.change_pct != null && (
+                      <span className="text-sm font-medium text-yiwu-400">
+                        环比 +{data.yiwu_index.official.change_pct}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {data.yiwu_index.official.source_url && (
+                  <a
+                    href={data.yiwu_index.official.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-yiwu-400 hover:text-yiwu-300 transition"
+                  >
+                    <ExternalLink size={12} /> 来源核验
+                  </a>
+                )}
+              </div>
+              {data.yiwu_index.official.fetched_at_iso && (
+                <p className="mt-2 text-xs text-gray-500">
+                  抓取时间：{data.yiwu_index.official.fetched_at_iso}
+                  {data.yiwu_index.official.note ? ` · ${data.yiwu_index.official.note}` : ''}
+                </p>
+              )}
+              {data.yiwu_index.official.excerpt && (
+                <p className="mt-1 text-xs text-gray-600 italic">原文摘录：{data.yiwu_index.official.excerpt}</p>
+              )}
             </div>
-            <div className="flex items-center gap-4">
-              <span className={`rounded-full px-3 py-1 text-sm font-medium ${data.yiwu_index.change > 0 ? 'bg-yiwu-500/10 text-yiwu-400' : 'bg-red-500/10 text-red-400'}`}>
+          )}
+
+          {/* 实时汇率 */}
+          {data.yiwu_index.exchange_rate?.is_real && data.yiwu_index.exchange_rate.rate != null && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-ocean-800/50 p-3">
+              <span className="flex items-center gap-2 text-sm text-gray-300">
+                <Coins size={16} className="text-gold-400" />
+                USD/CNY 参考汇率
+                <span className="font-bold text-white">{data.yiwu_index.exchange_rate.rate}</span>
+              </span>
+              <span className="text-xs text-gray-500">
+                {data.yiwu_index.exchange_rate.as_of || ''}
+                {data.yiwu_index.exchange_rate.provider ? ` · ${data.yiwu_index.exchange_rate.provider}` : ''}
+              </span>
+            </div>
+          )}
+
+          {/* 真实源不可用时的诚实提示 */}
+          {data.yiwu_index.official && !data.yiwu_index.official.is_real && (
+            <p className="text-xs text-gold-400/80">
+              {data.yiwu_index.official.note || '义乌指数真实源暂不可用，以下显示演示基准值'}
+            </p>
+          )}
+
+          {/* 演示基准（弱化标注，向后兼容，避免与真实值混淆） */}
+          <div className="flex items-center justify-between border-t border-white/5 pt-3">
+            <span className="text-xs text-gray-500">
+              演示基准(98-110)·非实时：{data.yiwu_index.current}
+            </span>
+            <div className="flex items-center gap-3">
+              <span className={`text-xs ${data.yiwu_index.change > 0 ? 'text-yiwu-400' : 'text-red-400'}`}>
                 {data.yiwu_index.change > 0 ? '+' : ''}{data.yiwu_index.change} {data.yiwu_index.trend}
               </span>
-              <span className="rounded-full bg-gold-500/10 px-3 py-1 text-sm font-medium text-gold-400">
-                品类指数: {data.yiwu_index.category_score}
-              </span>
+              <span className="text-xs text-gray-500">品类指数: {data.yiwu_index.category_score}</span>
             </div>
           </div>
         </div>
@@ -246,8 +324,10 @@ export default function MarketInsight() {
       </div>
 
       {/* Data Sources */}
-      <div className="text-xs text-gray-600 text-center">
-        数据来源: {data.data_sources?.join(' · ')}（静态演示数据）
+      <div className="text-xs text-gray-600 text-center leading-relaxed">
+        数据来源: {data.data_sources?.join(' · ')}
+        <br />
+        义乌指数 / 汇率为真实接入（官方发布值 · 每日参考汇率，带时间戳可核验）；品类 / 竞争 / 价格等为演示静态值
       </div>
 
       {/* AI Insight */}

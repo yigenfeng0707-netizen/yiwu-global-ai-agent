@@ -17,6 +17,31 @@ export interface Competitor { name: string; market_share: string; strength?: str
 export interface Recommendation { product: string; rating: number; reason?: string; predicted_sales?: string; }
 export interface Risk { description: string; level: string; mitigation?: string; }
 
+export interface OfficialIndex {
+  is_real: boolean;
+  index_value: number | null;
+  scale?: string;
+  as_of?: string;
+  category_matched?: string;
+  change_pct?: number | null;
+  source_url?: string;
+  fetched_at_iso?: string;
+  excerpt?: string;
+  note?: string;
+}
+
+export interface ExchangeRate {
+  is_real: boolean;
+  currency?: string;
+  base?: string;
+  rate: number | null;
+  as_of?: string;
+  source_url?: string;
+  fetched_at_iso?: string;
+  provider?: string;
+  note?: string;
+}
+
 export interface MarketInsightData {
   category: string; region: string;
   market_size: string; market_growth: string;
@@ -26,7 +51,13 @@ export interface MarketInsightData {
   competitors: Competitor[];
   recommendations: Recommendation[];
   risks: Risk[];
-  yiwu_index?: { current: number; change: number; trend: string; category_score: number; };
+  yiwu_index?: {
+    current: number; change: number; trend: string; category_score: number;
+    demo_scale?: string;
+    is_real?: boolean;
+    official?: OfficialIndex;
+    exchange_rate?: ExchangeRate;
+  };
   data_sources?: string[];
 }
 
