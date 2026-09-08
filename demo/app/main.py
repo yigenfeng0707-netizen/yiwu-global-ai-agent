@@ -12,6 +12,7 @@ from .api.routes import router
 from .middleware.auth import AuthMiddleware
 from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.signature import SignatureMiddleware
+from .middleware.api_usage import ApiUsageMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,8 @@ else:
     origins = ["*"]
     allow_credentials = False
 
+# ApiUsage 置于最内层(最先注册)：在 Auth 之后执行能读到 user，记录到达路由的真实 status
+app.add_middleware(ApiUsageMiddleware)
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=allow_credentials, allow_methods=["*"], allow_headers=["*"])
 # 中间件执行顺序（Starlette 中后注册者先执行）：Signature → Auth → RateLimit → CORS
 # 关键修正：Auth 必须先于 RateLimit 执行，RateLimit 才能读到 request.state.user 做认证用户差异化限流。

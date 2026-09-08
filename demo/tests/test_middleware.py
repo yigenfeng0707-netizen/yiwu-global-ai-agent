@@ -238,3 +238,31 @@ async def test_signature_pass_with_valid_signature(monkeypatch):
         r = await c.post("/api/v1/x", content=body,
                          headers={"Content-Type": "application/json", "X-Timestamp": ts, "X-Signature": sig})
     assert r.status_code == 200
+
+# ==================== ApiUsageMiddleware (P2-9) ====================
+
+@pytest.mark.asyncio
+async def test_api_usage_records_api_paths_only():
+    """ApiUsageMiddleware 记录 /api/ 请求、跳过非 /api/（前后差值验证，不受其他测试累积影响）"""
+    from app.middleware.api_usage import ApiUsageMiddleware
+    from app.db.database import get_db
+    db = get_db()
+    app = FastAPI()
+    app.add_middleware(ApiUsageMiddleware)
+
+    @app.get("/api/probe")
+    async def ep():
+        return {"ok": True}
+
+    @app.get("/probe-nonapi")
+    async def ep2():
+        return {"ok": True}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        b4 = db.get_api_usage_stats(hours=1)["total_calls"]
+        await c.get("/api/probe")
+        mid = db.get_api_usage_stats(hours=1)["total_calls"]
+        await c.get("/probe-nonapi")
+        aft = db.get_api_usage_stats(hours=1)["total_calls"]
+    assert mid == b4 + 1   # /api/ 请求被记录
+    assert aft == mid      # 非 /api/ 请求不记录
