@@ -87,3 +87,10 @@ htmlcov/
 
 .tmp_*.json
 demo/data/app.db
+
+# ========================
+# 演示视频（P3-4 重录前的 WIP 产物，避免 git 膨胀）
+# ========================
+docs/videos/*.webm
+docs/videos/*.mp4
+docs/videos/*.mov
