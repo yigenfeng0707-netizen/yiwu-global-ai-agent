@@ -15,4 +15,6 @@ COPY web_dist ./web_dist
 
 EXPOSE 7860
 
+HEALTHCHECK --interval=30s --timeout=6s --start-period=40s --retries=5 \n  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:7860/health',timeout=5).status==200 else 1)" || exit 1
+
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]

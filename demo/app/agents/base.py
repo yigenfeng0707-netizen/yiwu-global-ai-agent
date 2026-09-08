@@ -1,11 +1,14 @@
 """义乌小商品出海智能体 - Agent基类（LLM增强版）"""
 
+import logging
 import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
 from ..services.llm import llm_service
 from ..db.database import get_db
+
+logger = logging.getLogger(__name__)
 
 
 class BaseAgent(ABC):
@@ -78,5 +81,6 @@ class BaseAgent(ABC):
         """记录查询到数据库"""
         try:
             self._db.record_query(self.name, params, result_summary)
-        except Exception:
-            pass  # 记录失败不影响主流程
+        except Exception as e:
+            # 记录失败不影响主流程，但保留调试日志（不再静默吞异常）
+            logger.debug("record_query 写入失败(%s): %s", self.name, e)

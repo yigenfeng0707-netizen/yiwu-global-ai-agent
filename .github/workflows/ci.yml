@@ -32,7 +32,10 @@ jobs:
       - name: Lint with flake8
         run: |
           pip install flake8
-          flake8 app/ --max-line-length=120 --count --show-source --statistics || true
+          # P2-6 门禁收紧：严重错误(E9,F63,F7,F82 语法/未定义名)零容忍，去 || true
+          flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          # 风格检查(行长等)显式非阻塞，仅报告不失败
+          flake8 app/ --count --max-line-length=120 --statistics --exit-zero
 
       - name: Run Python unit tests
         run: |
@@ -62,7 +65,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Lint
-        run: npx eslint . --max-warnings=999
+        run: npx eslint . --max-warnings=0
 
       - name: Build verification
         run: npm run build
