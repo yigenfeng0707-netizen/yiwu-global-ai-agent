@@ -57,6 +57,8 @@ pnpm-debug.log*
 .Spotlight-V100
 .Trashes
 ehthumbs.db
+# Office 临时锁文件（Word COM 批量转 PDF 时产生，如 ~$商业计划书.docx）
+~$*
 Thumbs.db
 Desktop.ini
 

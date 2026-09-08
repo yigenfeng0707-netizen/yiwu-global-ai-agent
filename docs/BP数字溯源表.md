@@ -42,10 +42,21 @@
 
 | BP 中的数字 | 复现方法 | 置信度 |
 |---|---|---|
-| **103 个自动化单元测试全绿** | `cd demo && python -m pytest tests/ -q`（CI 已固化，GitHub Actions 每次提交自动跑） | ★★★ |
+| **144 个自动化单元测试全绿** | `cd demo && python -m pytest tests/ -q`（CI 已固化，GitHub Actions 每次提交自动跑；含 P1-1 新增 test_etl.py 28 用例） | ★★★ |
 | **7大AI Agent全链路** | 演示站"全链路"页一键运行：https://gsym236998-yiwu-global-ai-agent.ms.show | ★★★ |
-| LLM 真实接入（非静态数据） | 演示站顶栏"实时数据·AI已接入"徽章 + 市场洞察页 AI 商业洞察卡片；CI 部署后自动冒烟断言 ai_insight | ★★★ |
+| LLM 真实接入（非静态数据） | 演示站顶栏数据源状态徽章据后端 `/status` 真值三态显示（真实/降级/演示，P0-5 已移除会说谎的"AI已接入"固定绿灯）；市场洞察页义乌指数卡片有"官方发布值·真实数据"绿色徽章 + AI 商业洞察卡片；CI 部署后自动冒烟断言 ai_insight | ★★★ |
 | LangGraph 多Agent编排 | `demo/app/agents/workflow.py`（StateGraph 7节点+条件路由，源码可查） | ★★★ |
+
+## 六、数据源真实性（P1-1 新增 · 答辩追问"数据是真的吗"的标准答案卡）
+
+| 数据 | 状态与来源 | 现场核验入口 | 置信度 |
+|---|---|---|---|
+| **实时汇率**（USD/CNY/EUR 等） | ✅ 已真实接入 `open.er-api.com/v6/latest/USD`（每日参考汇率，响应自带官方更新时间戳） | 现场 `POST /api/v1/data-sources/refresh` 后 `GET /api/v1/yiwu-index`，看 `exchange_rate.rate` 与 `as_of`；或浏览器直接打开该 URL 对比数值 | ★★★ |
+| **义乌指数官方发布值** | ✅ 已真实接入 `ywindex.com/report` 官网公开发布值（千点基准·定期更新，如伞具类 1576.52 点 / 五金工具类 1557.03 点） | `GET /api/v1/yiwu-index` 的 `official_published.records` 每条带 `as_of` 日期与 `source_url`；市场洞察页义乌指数卡片有绿色"官方发布值·真实数据"徽章 + 来源核验外链 + 抓取时间 | ★★★ |
+| **数据源三态清单** | ✅ `GET /api/v1/data-sources` 返回 `real_count=2 / total=7`（2 真实 + 3 演示 + 2 规划），诚实标注每个源状态 | 现场打开该接口，逐源看 `status`（real/demo/planned）与 `is_real` | ★★★ |
+| 义乌市场 SKU/商铺、义新欧、Amazon/Alibaba | 🔶 演示静态数据 / ⬜ 规划中，平台**明确标注、不冒充实时** | `sources.py` 内置来源清单 + `/data-sources` 三态标注可现场出示 | ★★ |
+
+> 💡 **答辩话术**：被问"这些数据是真的吗"时，**直接现场刷新** `POST /api/v1/data-sources/refresh`，展示汇率与义乌指数两个真实源的请求-响应与官方时间戳；其余源如实说明为演示数据集/接入规划中。用"敢标注哪些是演示"换取"真的那些不容置疑"——这比声称"全是实时"更经得起追问。
 
 ## 答辩话术提示
 

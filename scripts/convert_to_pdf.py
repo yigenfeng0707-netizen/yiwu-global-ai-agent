@@ -9,9 +9,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-BASE_DIR = Path(__file__).parent
+# docx/pdf 产物位于仓库 docs/ 目录（本脚本在 scripts/；此前 BASE_DIR 指向脚本自身目录会导致全部跳过）
+BASE_DIR = Path(__file__).resolve().parent.parent / "docs"
 
 DOC_LIST = [
+    "商业计划书",
     "竞品分析",
     "技术文档",
     "财务预测与商业计划",
