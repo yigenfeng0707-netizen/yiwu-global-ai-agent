@@ -10,8 +10,28 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: modelscope-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Backend tests (门禁：测试失败则不部署)
+        run: |
+          cd demo
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+          pytest tests/ -q
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
