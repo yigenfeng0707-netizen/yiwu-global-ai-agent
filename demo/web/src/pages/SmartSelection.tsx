@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, Loader2, CheckCircle2, Circle, Truck } from 'lucide-react';
+import { ChevronDown, Loader2, CheckCircle2, Circle, Truck, Sparkles } from 'lucide-react';
 import { useStore, categories } from '@/store/useStore';
 import { fetchSmartSelection, type SmartSelectionData } from '@/utils/api';
 import ScoreCircle from '@/components/ScoreCircle';
@@ -234,6 +234,16 @@ export default function SmartSelection() {
           ))}
         </div>
       </div>
+
+      {/* AI 选品策略建议（后端 LLM 增强，ai_used=true 时返回） */}
+      {data.ai_recommendation && (
+        <div className="glass-light rounded-xl p-6 border border-yiwu-500/20">
+          <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+            <Sparkles size={16} className="text-yiwu-400" /> AI 选品策略建议
+          </h3>
+          <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">{data.ai_recommendation}</p>
+        </div>
+      )}
     </motion.div>
   );
 }

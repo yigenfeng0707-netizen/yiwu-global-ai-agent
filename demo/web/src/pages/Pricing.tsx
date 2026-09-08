@@ -15,6 +15,15 @@ interface Plan {
 
 const plans: Plan[] = [
   {
+    name: '义乌商户专享版',
+    price: '199',
+    period: '元/月',
+    description: '义乌国际商贸城商户专属普惠价',
+    features: ['高级版全部功能', '义乌专属数据', '供应链优先匹配', '1039合规指导', '义新欧班列专享运价'],
+    highlight: true,
+    cta: '义乌商户首选',
+  },
+  {
     name: '基础版',
     price: '299',
     period: '元/月',
@@ -28,9 +37,9 @@ const plans: Plan[] = [
     price: '999',
     period: '元/月',
     description: '适合成长型电商企业',
-    features: ['基础版全部功能', '供应链匹配(6大Agent)', '合规助手(15国)', '智能客服(7x24h)', '义新欧班列物流'],
-    highlight: true,
-    cta: '最受欢迎',
+    features: ['基础版全部功能', '供应链匹配(7大Agent)', '合规助手(15国)', '智能客服(7x24h)', '义新欧班列物流'],
+    highlight: false,
+    cta: '立即订阅',
   },
   {
     name: '企业定制',

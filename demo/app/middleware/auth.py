@@ -1,11 +1,17 @@
 """义乌小商品出海智能体 - 认证中间件"""
 
 import os
+import logging
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from ..services.auth import auth_service
+
+logger = logging.getLogger(__name__)
+
+# 一次性告警标志：避免每个请求都刷 warning
+_skip_warned = False
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -22,7 +28,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # 检查是否需要认证
         jwt_secret = os.getenv("JWT_SECRET", "")
         if not jwt_secret:
-            # 未配置JWT_SECRET则跳过认证
+            # 未配置JWT_SECRET则跳过认证（fail-open）——首次显式告警，避免线上无保护状态被静默忽略
+            global _skip_warned
+            if not _skip_warned:
+                logger.warning("JWT_SECRET 未配置，认证中间件跳过：%s 处于无保护状态（生产环境须注入）", self.PROTECTED_PATHS)
+                _skip_warned = True
             return await call_next(request)
 
         path = request.url.path

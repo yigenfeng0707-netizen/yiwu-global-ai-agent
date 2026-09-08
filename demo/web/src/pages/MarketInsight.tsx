@@ -247,7 +247,7 @@ export default function MarketInsight() {
 
       {/* Data Sources */}
       <div className="text-xs text-gray-600 text-center">
-        数据来源: {data.data_sources?.join(' · ')}
+        数据来源: {data.data_sources?.join(' · ')}（静态演示数据）
       </div>
 
       {/* AI Insight */}

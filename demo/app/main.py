@@ -1,6 +1,7 @@
 """义乌小商品出海智能体 - FastAPI主应用"""
 
 import os
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -12,6 +13,8 @@ from .middleware.auth import AuthMiddleware
 from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.signature import SignatureMiddleware
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(
     title="义乌小商品出海智能体 API",
     description="基于义乌小商品城数据，为跨境电商提供市场洞察、智能选品、供应链匹配、内容生成、合规查询、智能客服等一站式AI服务",
@@ -21,17 +24,37 @@ app = FastAPI(
 # 前端静态资源目录（魔搭创空间等单容器部署时由 CI 注入 web_dist）
 WEB_DIST = Path(os.getenv("WEB_DIST") or Path(__file__).resolve().parent.parent / "web_dist")
 
-# CORS
+# CORS：配置白名单时才允许携带凭证；回退通配符时关闭 credentials（修复 "*" + credentials 的非法组合）
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "")
 if allowed_origins:
     origins = [o.strip() for o in allowed_origins.split(",") if o.strip()]
+    allow_credentials = True
 else:
     origins = ["*"]
+    allow_credentials = False
 
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=allow_credentials, allow_methods=["*"], allow_headers=["*"])
 app.add_middleware(AuthMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SignatureMiddleware)
+
+
+def _log_security_posture() -> None:
+    """启动安全自检：把密钥缺失导致的 fail-open 从静默变为显式告警（便于运维/答辩自证）。"""
+    cors_mode = f"白名单({len(origins)}域)" if allow_credentials else "通配符*(不携带凭证)"
+    logger.info("[安全自检] CORS 模式=%s", cors_mode)
+    for key, purpose in (
+        ("JWT_SECRET", "接口鉴权(AuthMiddleware)"),
+        ("API_SECRET", "请求签名(SignatureMiddleware)"),
+        ("LLM_API_KEY", "AI 增强(缺失则静默降级为模板)"),
+    ):
+        if os.getenv(key):
+            logger.info("[安全自检] %s 已配置 —— %s 生效", key, purpose)
+        else:
+            logger.warning("[安全自检] %s 未配置 —— %s 将被跳过/降级（生产环境务必注入）", key, purpose)
+
+
+_log_security_posture()
 
 # 注册路由
 app.include_router(router, prefix="/api/v1")

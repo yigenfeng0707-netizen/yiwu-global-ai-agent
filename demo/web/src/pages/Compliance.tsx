@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, Loader2, ShieldCheck, FileCheck, AlertTriangle, Calculator, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
+import { ChevronDown, Loader2, ShieldCheck, FileCheck, AlertTriangle, Calculator, CheckCircle2, XCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { categories } from '@/store/useStore';
 import { fetchComplianceCheck, calculateTariff } from '@/utils/api';
 
@@ -15,6 +15,7 @@ interface ComplianceView {
   clearance_documents: ClearanceDoc[];
   compliance_checks: ComplianceItem[];
   special_requirements: string[];
+  ai_compliance_advice?: string;
 }
 interface TariffData {
   product_value: number; tariff_rate: string; tariff_amount: number;
@@ -54,6 +55,7 @@ export default function Compliance() {
           risk_level: it.risk_level,
         })),
         special_requirements: result.special_requirements ? [result.special_requirements] : [],
+        ai_compliance_advice: result.ai_compliance_advice,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : '查询失败，请稍后重试');
@@ -185,6 +187,14 @@ export default function Compliance() {
               {complianceData.special_requirements.map((req, i) => (
                 <p key={i} className="text-xs text-gray-400">• {req}</p>
               ))}
+            </div>
+          )}
+
+          {/* AI 合规风险提示与通关建议（后端 LLM 增强，ai_used=true 时返回） */}
+          {complianceData.ai_compliance_advice && (
+            <div className="glass-light rounded-xl p-6 border border-yiwu-500/20">
+              <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2"><Sparkles size={14} className="text-yiwu-400" /> AI 合规风险提示与通关建议</h4>
+              <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">{complianceData.ai_compliance_advice}</p>
             </div>
           )}
         </motion.div>

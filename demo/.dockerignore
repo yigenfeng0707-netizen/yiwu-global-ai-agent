@@ -1,0 +1,43 @@
+# Docker 构建上下文忽略清单
+# 防止 demo/Dockerfile 的 `COPY . .` 把密钥、数据库、缓存打进镜像
+# （魔搭线上用 deploy/modelscope/Dockerfile 精确 COPY，不受影响；此处防御本地/compose 构建）
+
+# 密钥与环境变量
+.env
+.env.*
+!.env.example
+
+# 运行时数据库（含用户密码哈希，绝不入镜像）
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+.pytest_cache/
+htmlcov/
+.coverage
+
+# 测试（生产镜像不需要）
+tests/
+pytest.ini
+
+# 前端源码与依赖（镜像只需预构建的 web_dist）
+web/node_modules/
+web/dist/
+web/.vite/
+
+# 构建产物与临时文件
+build/
+*.log
+*.tmp
+.tmp_*.json
+llm_daily_count.json
+
+# 版本控制与 IDE
+.git/
+.gitignore
+.idea/
+.vscode/

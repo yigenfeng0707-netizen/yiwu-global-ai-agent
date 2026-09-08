@@ -3,6 +3,7 @@
 from typing import Any, Dict, List, Optional
 
 from .base import BaseAgent
+from ..services.llm import llm_service
 from ..data.policy_data import (
     CITY_1039_DATA, POLICY_1039_DETAIL, YIWU_SUCCESS_CASES,
     POLICY_BENEFIT_PARAMS,
@@ -37,17 +38,29 @@ class PolicyReplicationAgent(BaseAgent):
             )
         else:
             # 默认返回概览
-            return self._wrap_response({
+            key_benefits = [p["title"] for p in POLICY_1039_DETAIL["key_points"][:3]]
+            result = self._wrap_response({
                 "total_cities": len(CITY_1039_DATA),
                 "policy_name": POLICY_1039_DETAIL["policy_name"],
                 "policy_code": POLICY_1039_DETAIL["policy_code"],
-                "key_benefits": [p["title"] for p in POLICY_1039_DETAIL["key_points"][:3]],
+                "key_benefits": key_benefits,
                 "cases_count": len(YIWU_SUCCESS_CASES),
             })
+            insight = await self._llm_policy_insight(
+                "1039市场采购贸易政策复制推广概览",
+                f"政策名称：{POLICY_1039_DETAIL['policy_name']}；已覆盖{len(CITY_1039_DATA)}个试点城市；"
+                f"核心红利：{key_benefits}；义乌成功案例{len(YIWU_SUCCESS_CASES)}个。",
+            )
+            if insight:
+                result["ai_insight"] = insight.strip()
+                result["ai_used"] = True
+            else:
+                result["ai_used"] = False
+            return result
 
     async def get_policy_guide(self) -> Dict[str, Any]:
-        """1039市场采购贸易政策解读"""
-        return self._wrap_response({
+        """1039市场采购贸易政策解读（含 LLM 实操解读增强）"""
+        result = self._wrap_response({
             "policy_name": POLICY_1039_DETAIL["policy_name"],
             "policy_code": POLICY_1039_DETAIL["policy_code"],
             "background": POLICY_1039_DETAIL["background"],
@@ -56,6 +69,17 @@ class PolicyReplicationAgent(BaseAgent):
             "operation_process": POLICY_1039_DETAIL["operation_process"],
             "tax_benefits": POLICY_1039_DETAIL["tax_benefits"],
         })
+        insight = await self._llm_policy_insight(
+            "1039市场采购贸易政策解读",
+            f"政策：{POLICY_1039_DETAIL['policy_name']}（{POLICY_1039_DETAIL['policy_code']}）；"
+            f"核心要点：{[p['title'] for p in POLICY_1039_DETAIL['key_points'][:4]]}。",
+        )
+        if insight:
+            result["ai_policy_insight"] = insight.strip()
+            result["ai_used"] = True
+        else:
+            result["ai_used"] = False
+        return result
 
     async def get_city_info(self, city_name: str = "") -> Dict[str, Any]:
         """39城复制推广信息查询"""
@@ -244,7 +268,7 @@ class PolicyReplicationAgent(BaseAgent):
                 "advice": "请指定目标城市以获取更精准的本地化适配建议",
             })
 
-        return self._wrap_response({
+        result = self._wrap_response({
             "case": case,
             "target_city": target_city_info,
             "localization_advice": localization_advice,
@@ -257,3 +281,31 @@ class PolicyReplicationAgent(BaseAgent):
                 "建立本地化供应链和分销网络",
             ],
         })
+
+        # LLM 增强：生成"义乌经验→目标城市"的智能适配洞察
+        city_desc = target_city_info["city"] if target_city_info else (target_city or "未指定城市")
+        insight = await self._llm_policy_insight(
+            "义乌成功案例本地化适配",
+            f"案例：{case.get('title', '')}（品类{case.get('category', '')}）；目标城市：{city_desc}；"
+            f"已生成规则化适配建议{len(localization_advice)}条。",
+        )
+        if insight:
+            result["ai_localization_insight"] = insight.strip()
+            result["ai_used"] = True
+        else:
+            result["ai_used"] = False
+        return result
+
+    async def _llm_policy_insight(self, scene: str, detail: str) -> Optional[str]:
+        """调用 LLM 生成政策解读/落地建议；未配置 API Key 时返回 None（降级为纯规则结果）。"""
+        if not llm_service.api_key:
+            return None
+        prompt = (
+            f"请针对以下义乌发展经验/1039市场采购贸易政策场景，给出2-3条简洁、可执行的政策解读或落地建议"
+            f"（每条不超过60字）：\n场景：{scene}\n详情：{detail}"
+        )
+        return await self.llm_generate(
+            prompt,
+            system_prompt="你是1039市场采购贸易政策与义乌发展经验复制推广专家，擅长把国家政策转化为商户可执行的落地建议，回答专业、简洁、务实。",
+            temperature=0.5, max_tokens=380,
+        )

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronRight, Download, Loader2, Play, CheckCircle2, Circle, BarChart3, Target, Sparkles, ShieldCheck, HelpCircle, Truck, RefreshCw, Building2 } from 'lucide-react';
 import { categories } from '@/store/useStore';
-import { runPipeline, type PipelineResult } from '@/utils/api';
+import { runPipeline, runPipelineStream, type PipelineResult } from '@/utils/api';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle } from 'docx';
 import { saveAs } from 'file-saver';
 
@@ -59,33 +59,61 @@ export default function Pipeline() {
     setStepStatuses(steps.map(() => 'pending'));
     setExpandedSteps(new Set());
 
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    steps.forEach((_, i) => {
-      timers.push(setTimeout(() => {
-        setStepStatuses((prev) => {
-          const next = [...prev];
-          next[i] = 'running';
-          if (i > 0) next[i - 1] = 'completed';
-          return next;
-        });
-      }, i * 800));
-    });
+    const req = {
+      category, region, budget,
+      target_country: targetCountry,
+      platform, target_language: targetLang,
+    };
 
+    // 起始：第一步置为 running（真实推进由后端 SSE 节点事件驱动，不再用定时器假动画）
+    setStepStatuses((prev) => { const n = [...prev]; if (n.length) n[0] = 'running'; return n; });
+
+    let streamed = false;
+    let sseError = false;
     try {
-      const res = await runPipeline({
-        category, region, budget,
-        target_country: targetCountry,
-        platform, target_language: targetLang,
+      streamed = await runPipelineStream(req, (evt) => {
+        if (evt.type === 'step' && evt.step) {
+          const idx = steps.findIndex((s) => s.key === evt.step);
+          setStepStatuses((prev) => {
+            const next = [...prev];
+            if (idx >= 0) {
+              next[idx] = 'completed';
+              // 下一个待执行节点置 running，形成真实推进效果
+              for (let j = idx + 1; j < next.length; j++) {
+                if (next[j] === 'pending') { next[j] = 'running'; break; }
+              }
+            }
+            return next;
+          });
+        } else if (evt.type === 'done') {
+          setResult({
+            state: evt.state ?? {},
+            summary: evt.summary ?? { total_steps: steps.length, steps_completed: steps.length, duration_seconds: 0, errors: 0, product: category },
+            _demo: false,
+          });
+          setStepStatuses(steps.map(() => 'completed'));
+        } else if (evt.type === 'error') {
+          sseError = true;
+          setError(evt.error || '全链路执行失败，请稍后重试');
+        }
       });
-      setResult(res);
-      setStepStatuses(steps.map(() => 'completed'));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '全链路执行失败，请稍后重试');
-      setStepStatuses(steps.map(() => 'pending'));
-    } finally {
-      timers.forEach(clearTimeout);
-      setLoading(false);
+    } catch {
+      streamed = false;
     }
+
+    // 流式不可用（且未收到明确 error 事件）时降级到同步端点（含 mock 兜底）
+    if (!streamed && !sseError) {
+      try {
+        const res = await runPipeline(req);
+        setResult(res);
+        setStepStatuses(steps.map(() => 'completed'));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '全链路执行失败，请稍后重试');
+        setStepStatuses(steps.map(() => 'pending'));
+      }
+    }
+
+    setLoading(false);
   };
 
   const handleDownloadReport = async () => {
@@ -160,7 +188,7 @@ export default function Pipeline() {
     children.push(bodyText('目标平台', platform));
     children.push(bodyText('目标语言', targetLang));
     children.push(bodyText('完成步骤', `${result.summary.steps_completed}/${result.summary.total_steps}`));
-    children.push(bodyText('执行耗时', `${result.summary.duration_seconds.toFixed(1)}秒`));
+    children.push(bodyText('执行耗时', result._demo ? '—（演示数据，非真实执行）' : `${result.summary.duration_seconds.toFixed(1)}秒`));
     children.push(divider());
 
     // 7步详情
@@ -327,6 +355,14 @@ export default function Pipeline() {
       children: [new TextRun({ text: '—— 义乌小商品出海智能体-OPC 生成 ——', size: 18, color: GRAY, font: 'Microsoft YaHei', italics: true })],
     }));
 
+    if (result._demo) {
+      children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 240 },
+        children: [new TextRun({ text: '⚠ 本报告基于演示数据生成（后端未连接），执行统计与结果不代表真实运行。', size: 18, color: 'C0392B', font: 'Microsoft YaHei', bold: true })],
+      }));
+    }
+
     const doc = new Document({
       sections: [{ properties: {}, children }],
     });
@@ -462,9 +498,14 @@ export default function Pipeline() {
               <Download size={14} /> 下载完整报告
             </button>
           </div>
+          {result._demo && (
+            <div className="mb-4 rounded-lg border border-gold-500/30 bg-gold-500/10 px-3 py-2 text-xs text-gold-300">
+              ⚠ 演示数据：后端未连接，以下为本地示例结果，执行耗时/错误数等统计不代表真实运行。
+            </div>
+          )}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <SummaryCard label="完成步骤" value={`${result.summary.steps_completed}/${result.summary.total_steps}`} />
-            <SummaryCard label="耗时" value={`${result.summary.duration_seconds.toFixed(1)}秒`} />
+            <SummaryCard label="耗时" value={result._demo ? '—（演示）' : `${result.summary.duration_seconds.toFixed(1)}秒`} />
             <SummaryCard label="错误数" value={`${result.summary.errors}`} highlight={result.summary.errors > 0} />
             <SummaryCard label="推荐产品" value={result.summary.product || '-'} highlight />
           </div>

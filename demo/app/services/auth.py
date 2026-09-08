@@ -25,8 +25,11 @@ class AuthService:
     def __init__(self):
         self.secret = os.getenv("JWT_SECRET", "")
         if not self.secret:
-            logger.warning("JWT_SECRET 未配置，使用开发默认密钥（仅限本地开发，生产须注入环境变量）")
-            self.secret = "yiwu-chuhai-dev-secret-key"
+            # 不再使用随仓库开源的固定兜底密钥（可被伪造）；改为进程级随机密钥。
+            # 影响：进程重启后旧 token 失效；多 worker 间 token 不通用（当前为单 worker 内存态，可接受）。
+            # 生产环境务必注入 JWT_SECRET 以获得稳定、跨进程的签名密钥。
+            self.secret = secrets.token_hex(32)
+            logger.warning("JWT_SECRET 未配置，已生成进程级随机密钥（重启后旧 token 失效；生产环境须注入 JWT_SECRET）")
         self.algorithm = "HS256"
         self.expire_hours = 24
         self.db = get_db()

@@ -1,6 +1,9 @@
 """义乌小商品出海智能体 - API路由"""
 
+import json
+
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
 from ..agents.market_insight import MarketInsightAgent
 from ..agents.smart_selection import SmartSelectionAgent
@@ -22,6 +25,18 @@ from ..services.llm import llm_service
 from ..cache import cache
 
 router = APIRouter()
+
+# Agent 引擎类型（P1-2 后 7 个 Agent 均接入 LLM 增强：确定性/规则骨架 + LLM 推理）
+# 用于 /status 与 /agents/info 对外如实反映 AI 接入程度，避免"7个AI数字员工"叙事与实现不符
+AGENT_ENGINES = {
+    "market_insight": "llm-enhanced",
+    "content_generation": "llm-enhanced",
+    "customer_service": "llm-enhanced",
+    "smart_selection": "llm-enhanced",
+    "supply_chain": "llm-enhanced",
+    "compliance": "llm-enhanced",
+    "policy_replication": "llm-enhanced",
+}
 
 # 初始化Agents
 market_agent = MarketInsightAgent()
@@ -50,16 +65,20 @@ async def api_root():
 @router.get("/agents/info")
 async def get_agents_info():
     """获取智能体信息"""
+    agents = [
+        {"name": "market_insight", "display_name": "市场洞察", "status": "online", "description": "分析全球市场趋势与义乌指数"},
+        {"name": "smart_selection", "display_name": "智能选品", "status": "online", "description": "基于多维度数据智能推荐选品"},
+        {"name": "content_generation", "display_name": "内容生成", "status": "online", "description": "生成多语言跨境电商内容"},
+        {"name": "compliance", "display_name": "合规查询", "status": "online", "description": "查询目标市场合规要求与关税"},
+        {"name": "customer_service", "display_name": "智能客服", "status": "online", "description": "多语言智能客服与FAQ"},
+        {"name": "supply_chain", "display_name": "供应链匹配", "status": "online", "description": "供应链与物流智能匹配"},
+        {"name": "policy_replication", "display_name": "政策复制", "status": "online", "description": "1039政策解读、39城复制推广、红利计算"},
+    ]
+    for a in agents:
+        a["engine"] = AGENT_ENGINES.get(a["name"], "rule-based")
     return {
-        "agents": [
-            {"name": "market_insight", "display_name": "市场洞察", "status": "online", "description": "分析全球市场趋势与义乌指数"},
-            {"name": "smart_selection", "display_name": "智能选品", "status": "online", "description": "基于多维度数据智能推荐选品"},
-            {"name": "content_generation", "display_name": "内容生成", "status": "online", "description": "生成多语言跨境电商内容"},
-            {"name": "compliance", "display_name": "合规查询", "status": "online", "description": "查询目标市场合规要求与关税"},
-            {"name": "customer_service", "display_name": "智能客服", "status": "online", "description": "多语言智能客服与FAQ"},
-            {"name": "supply_chain", "display_name": "供应链匹配", "status": "online", "description": "供应链与物流智能匹配"},
-            {"name": "policy_replication", "display_name": "政策复制", "status": "online", "description": "1039政策解读、39城复制推广、红利计算"},
-        ]
+        "agents": agents,
+        "ai_enhanced_count": sum(1 for a in agents if a["engine"] == "llm-enhanced"),
     }
 
 
@@ -251,6 +270,40 @@ async def run_pipeline(req: PipelineRequest):
     return result
 
 
+@router.post("/pipeline/stream")
+async def run_pipeline_stream(req: PipelineRequest):
+    """全链路工作流 - SSE 实时进度上报。
+
+    逐节点推送 LangGraph 真实执行状态（step/done/error 事件），
+    前端据此驱动进度条，替代此前的 setTimeout 假动画。
+    """
+    state = WorkflowState(
+        category=req.category,
+        region=req.region,
+        budget=req.budget,
+        target_country=req.target_country,
+        platform=req.platform,
+        target_language=req.target_language,
+    )
+
+    async def event_generator():
+        try:
+            async for evt in workflow.run_stream(state):
+                yield f"data: {json.dumps(evt, ensure_ascii=False)}\n\n"
+        except Exception as e:  # 顶层兜底：把异常作为 error 事件推给前端
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # 禁止 Nginx/网关缓冲，保证逐条实时下发
+            "Connection": "keep-alive",
+        },
+    )
+
+
 # ==================== 认证接口 ====================
 
 @router.post("/auth/register")
@@ -271,7 +324,7 @@ async def login(req: LoginRequest):
 
 @router.get("/status")
 async def get_status():
-    """系统状态"""
+    """系统状态（可自证的真实健康态）"""
     return {
         "service": "yiwu-chuhai-api",
         "version": "2.0.0",
@@ -284,6 +337,13 @@ async def get_status():
             "supply_chain": "online",
             "policy_replication": "online",
         },
+        # 诚实标注：AI 增强是否真正生效（取决于是否配置 LLM_API_KEY）
+        "llm_configured": bool(llm_service.api_key),
+        # 诚实标注：当前数据源为静态演示数据，非实时接入的外部数据管道
+        "data_mode": "static-demo",
+        # 各 Agent 引擎类型（llm-enhanced / rule-based）
+        "agent_engines": AGENT_ENGINES,
+        "ai_enhanced_count": sum(1 for e in AGENT_ENGINES.values() if e == "llm-enhanced"),
         "llm_usage": llm_service.daily_usage,
         "data_sources": len(data_manager.list_sources()),
         "cache": cache.stats,

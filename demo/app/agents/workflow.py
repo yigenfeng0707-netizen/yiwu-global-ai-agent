@@ -2,7 +2,7 @@
 
 import logging
 import time
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, AsyncGenerator, Dict, List, Optional, TypedDict
 from dataclasses import dataclass, field
 
 from .base import BaseAgent
@@ -220,6 +220,87 @@ class CrossBorderWorkflow:
 
         step_results = {k: final.get(k, {}) for k in (s["key"] for s in self.STEPS)}
         return {"state": step_results, "summary": summary}
+
+    async def run_stream(self, state: WorkflowState) -> AsyncGenerator[Dict[str, Any], None]:
+        """流式执行全链路工作流：逐节点产出真实进度事件（供 SSE 上报）。
+
+        事件类型：
+          - {"type":"step","step":key,"name":..,"status":"success|error|skipped","index":n,"total":N,"elapsed":秒}
+          - {"type":"done","summary":{...},"state":{各步结果}}
+        LangGraph 可用时用 astream 逐节点产出；否则/异常时顺序降级，同样逐节点产出。
+        """
+        start_time = time.time()
+        step_keys = [s["key"] for s in self.STEPS]
+        step_names = {s["key"]: s["name"] for s in self.STEPS}
+        total = len(step_keys)
+
+        init_state: GraphState = {
+            "category": state.category,
+            "region": state.region,
+            "budget": state.budget,
+            "target_country": state.target_country,
+            "platform": state.platform,
+            "target_language": state.target_language,
+            "product_name": state.product_name,
+            "errors": [],
+        }
+
+        final_state: Dict[str, Any] = dict(init_state)
+        emitted = 0
+        streamed = False
+
+        if self._graph is not None:
+            try:
+                async for chunk in self._graph.astream(init_state):
+                    for node_name, update in (chunk or {}).items():
+                        if not isinstance(update, dict):
+                            continue
+                        final_state.update(update)
+                        if node_name == "summarize" or node_name not in step_names:
+                            continue
+                        emitted += 1
+                        node_result = update.get(node_name, {})
+                        status = node_result.get("status", "success") if isinstance(node_result, dict) else "success"
+                        yield {
+                            "type": "step", "step": node_name, "name": step_names[node_name],
+                            "status": status, "index": emitted, "total": total,
+                            "elapsed": round(time.time() - start_time, 2),
+                        }
+                streamed = True
+            except Exception as e:
+                logger.warning("LangGraph astream 异常，降级顺序流式执行: %s", e)
+                streamed = False
+
+        if not streamed:
+            # 顺序降级：逐节点执行并产出真实进度（含条件路由跳过）
+            final_state = dict(init_state)
+            emitted = 0
+            for step in self.STEPS:
+                key = step["key"]
+                if key == "compliance" and self._route_after_content(final_state) != "compliance":
+                    yield {
+                        "type": "step", "step": key, "name": step_names[key], "status": "skipped",
+                        "index": emitted, "total": total, "elapsed": round(time.time() - start_time, 2),
+                    }
+                    continue
+                update = await self._run_agent_node(key, final_state)
+                final_state.update(update)
+                emitted += 1
+                node_result = update.get(key, {})
+                status = node_result.get("status", "success") if isinstance(node_result, dict) else "success"
+                yield {
+                    "type": "step", "step": key, "name": step_names[key], "status": status,
+                    "index": emitted, "total": total, "elapsed": round(time.time() - start_time, 2),
+                }
+            final_state.update(await self._summarize(final_state))
+
+        if "summary" not in final_state:
+            final_state.update(await self._summarize(final_state))
+
+        summary = dict(final_state.get("summary", {}))
+        summary["duration_seconds"] = round(time.time() - start_time, 2)
+        step_results = {k: final_state.get(k, {}) for k in step_keys}
+        yield {"type": "done", "summary": summary, "state": step_results}
 
     async def _run_sequential(self, init_state: GraphState) -> Dict[str, Any]:
         """顺序降级执行：LangGraph不可用或执行异常时兜底"""

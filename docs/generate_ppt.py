@@ -1184,7 +1184,7 @@ def slide_growth_flywheel():
 # ==================== 第21页：财务预测页（含39城收入） ====================
 def slide_financial():
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    add_page_header(slide, '财务预测', '12个月收入+39城复制，第8个月盈亏平衡')
+    add_page_header(slide, '财务预测', '12个月收入+39城复制，首月即实现正向现金流（营收以《财务预测与商业计划》697万为准，下表为早期保守季度测算）')
 
     # 收入数据表
     months_data = [
@@ -1300,7 +1300,7 @@ def slide_funding():
     milestones = [
         ('M1-3', '产品MVP上线，7大Agent核心功能完成', '义乌本地种子用户50+'),
         ('M4-6', '付费用户200+，月收入15万', '启动39城政策复制对接'),
-        ('M7-9', '盈亏平衡，付费用户500+', '首批5城政策复制落地'),
+        ('M7-9', '扩大盈利规模，付费用户500+', '首批5城政策复制落地'),
         ('M10-12', '月收入85万，准备Pre-A轮', '39城全面复制启动'),
     ]
     for i, (period, goal, detail) in enumerate(milestones):

@@ -18,8 +18,8 @@ from pathlib import Path
 YIWU_RED = RGBColor(0xD4, 0x27, 0x2C)       # 义乌红 #D4272C
 FONT_BODY = "微软雅黑"
 FONT_HEADING = "黑体"
-MD_PATH = Path(__file__).parent / "商业计划书.md"
-DOCX_PATH = Path(__file__).parent / "商业计划书.docx"
+MD_PATH = Path(__file__).resolve().parent.parent / "docs" / "商业计划书.md"
+DOCX_PATH = Path(__file__).resolve().parent.parent / "docs" / "商业计划书.docx"
 
 
 # ── 辅助函数 ──────────────────────────────────────────

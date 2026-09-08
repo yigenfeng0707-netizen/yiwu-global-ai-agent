@@ -19,7 +19,8 @@ from pathlib import Path
 YIWU_RED = RGBColor(0xD4, 0x27, 0x2C)       # 义乌红 #D4272C
 FONT_BODY = "微软雅黑"
 FONT_HEADING = "黑体"
-BASE_DIR = Path(__file__).parent
+# 文档位于仓库 docs/ 目录（本脚本在 scripts/；此前 BASE_DIR 指向脚本自身目录，重构后已失效）
+BASE_DIR = Path(__file__).resolve().parent.parent / "docs"
 
 # 需要转换的文档列表
 DOC_LIST = [

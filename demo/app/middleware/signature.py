@@ -4,9 +4,15 @@ import os
 import hmac
 import hashlib
 import time
+import logging
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
+
+# 一次性告警标志：避免每个请求都刷 warning
+_skip_warned = False
 
 
 class SignatureMiddleware(BaseHTTPMiddleware):
@@ -15,7 +21,11 @@ class SignatureMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         api_secret = os.getenv("API_SECRET", "")
         if not api_secret:
-            # 未配置API_SECRET则跳过签名验证
+            # 未配置API_SECRET则跳过签名验证（fail-open）——首次显式告警
+            global _skip_warned
+            if not _skip_warned:
+                logger.warning("API_SECRET 未配置，签名验证中间件跳过：POST 请求不做签名校验（生产环境须注入）")
+                _skip_warned = True
             return await call_next(request)
 
         # 只验证POST请求

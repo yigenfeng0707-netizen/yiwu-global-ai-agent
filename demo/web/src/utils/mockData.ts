@@ -47,7 +47,7 @@ export const mockMarketInsight = (category: string, region: string) => ({
     { description: '目标市场竞争加剧', level: 'low', mitigation: '差异化产品定位，强化品牌建设' },
   ],
   yiwu_index: { current: 102.8, change: 1.35, trend: '上涨', category_score: 105.2 },
-  data_sources: ['义乌指数', '海关总署', 'Eurostat', '世界银行'],
+  data_sources: ['静态演示数据'],
 });
 
 // ==================== 智能选品 Mock ====================
@@ -282,6 +282,7 @@ export const mockFAQ = (category: string, language: string) => ({
 
 // ==================== 全链路工作流 Mock ====================
 export const mockPipeline = () => ({
+  _demo: true, // 演示降级标记：后端不可达时的本地数据，前端据此隐藏伪造统计并加水印
   state: {
     market_insight: {
       category: '日用百货', region: '欧洲',

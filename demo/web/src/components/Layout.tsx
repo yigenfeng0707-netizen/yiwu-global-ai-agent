@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   BarChart3, Target, FileText, Shield, Headphones, Truck,
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 import DataSourceBadge from '@/components/DataSourceBadge';
+import { fetchSystemStatus, type SystemStatus } from '@/utils/api';
 
 const navItems = [
   { label: '首页', icon: Home, path: '/' },
@@ -21,17 +22,19 @@ const navItems = [
   { label: '套餐价格', icon: CreditCard, path: '/pricing' },
 ];
 
-const dataSourceStatus = [
-  { name: '义乌小商品城', status: 'online' },
-  { name: '义新欧班列', status: 'online' },
-  { name: 'Amazon', status: 'online' },
-  { name: 'Alibaba.com', status: 'online' },
-  { name: '行业报告', status: 'online' },
-];
+// 数据源名称（真实在线状态由后端 /status 决定，不再前端硬编码 online）
+const dataSourceNames = ['义乌小商品城', '义新欧班列', 'Amazon', 'Alibaba.com', '行业报告'];
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAuthenticated, user, logout } = useStore();
+  const [sysStatus, setSysStatus] = useState<SystemStatus | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchSystemStatus().then((s) => { if (mounted) setSysStatus(s); });
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -88,16 +91,29 @@ export default function Layout() {
             ))}
           </nav>
 
-          {/* Data Source Status */}
+          {/* Data Source Status（真实状态来自后端 /status，不再硬编码 online） */}
           <div className="border-t border-white/5 px-4 py-3">
             <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
-              <Database size={12} /> 数据源状态
+              <Database size={12} /> 数据源
+              {sysStatus ? (
+                <span
+                  className="ml-auto text-[10px] text-gold-400/80"
+                  title="当前为静态演示数据，非实时接入的外部数据管道"
+                >
+                  {sysStatus.data_mode === 'static-demo' ? '演示数据' : sysStatus.data_mode}
+                </span>
+              ) : (
+                <span className="ml-auto text-[10px] text-gray-600">待检测</span>
+              )}
             </p>
             <div className="space-y-1">
-              {dataSourceStatus.map((ds) => (
-                <div key={ds.name} className="flex items-center gap-2 text-xs">
-                  <span className={`h-1.5 w-1.5 rounded-full ${ds.status === 'online' ? 'bg-yiwu-500' : 'bg-gold-500'}`} />
-                  <span className="text-gray-500">{ds.name}</span>
+              {dataSourceNames.map((name) => (
+                <div key={name} className="flex items-center gap-2 text-xs">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${sysStatus ? 'bg-gold-500' : 'bg-gray-600'}`}
+                    title={sysStatus ? '演示数据（后端可达）' : '后端状态待检测'}
+                  />
+                  <span className="text-gray-500">{name}</span>
                 </div>
               ))}
             </div>
@@ -139,8 +155,17 @@ export default function Layout() {
           </div>
           <div className="flex items-center gap-3 text-xs text-gray-500">
             <DataSourceBadge />
-            <span className="hidden sm:inline">7 Agents 在线</span>
-            <span className="h-2 w-2 rounded-full bg-yiwu-500" />
+            {sysStatus ? (
+              <span
+                className="hidden sm:inline"
+                title="7 个 Agent 中真正接入大模型（LLM）的数量，以及 AI 增强是否已启用"
+              >
+                {sysStatus.ai_enhanced_count}/7 Agent · AI增强{sysStatus.llm_configured ? '已启用' : '未启用'}
+              </span>
+            ) : (
+              <span className="hidden sm:inline text-gray-600">状态检测中…</span>
+            )}
+            <span className={`h-2 w-2 rounded-full ${sysStatus ? 'bg-yiwu-500' : 'bg-gray-600'}`} />
           </div>
         </header>
 

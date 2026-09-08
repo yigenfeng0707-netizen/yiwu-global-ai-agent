@@ -38,6 +38,8 @@ export interface SmartSelectionData {
   profit_analysis: { cost_breakdown: Record<string, string>; revenue: Record<string, string>; break_even: Record<string, string>; };
   supply_recommendations: { supplier: string; location: string; moq: string; price_range: string; rating: number; recommended: boolean; }[];
   action_plan: Record<string, { name: string; tasks: string[] }>;
+  ai_recommendation?: string;
+  ai_used?: boolean;
 }
 
 export interface ContentGenerationData {
@@ -54,6 +56,8 @@ export interface ComplianceData {
   compliance_check: { checks: { item: string; status: string; risk_level: string; }[]; overall_status: string; };
   special_requirements?: string;
   tariff_benefits?: { description: string; benefits: string[]; };
+  ai_compliance_advice?: string;
+  ai_used?: boolean;
 }
 
 export interface SupplyChainData {
@@ -64,6 +68,8 @@ export interface SupplyChainData {
   trade_1039: { applicable: boolean; name: string; description: string; advantages: string[]; conditions: string[]; max_value_per_shipment: string; simplified_declaration: boolean; vat_exemption: boolean; };
   supply_score: { total: number; level: string; dimensions: Record<string, number>; };
   yiwu_trade_city: { total_shops: number; total_skus: number; district: string; };
+  ai_recommendation?: string;
+  ai_used?: boolean;
 }
 
 export interface LogisticsData {
@@ -89,6 +95,7 @@ export interface FAQResponseData {
 export interface PipelineResult {
   state: Record<string, unknown>;
   summary: { total_steps: number; steps_completed: number; duration_seconds: number; errors: number; product: string; };
+  _demo?: boolean; // true = 后端不可达时的演示降级数据
 }
 
 export interface PolicyCityData {
@@ -230,6 +237,67 @@ export async function runPipeline(req: { category: string; region: string; budge
   );
 }
 
+// ==================== 全链路 SSE 实时进度 ====================
+
+export interface PipelineStreamEvent {
+  type: 'step' | 'done' | 'error';
+  step?: string;
+  name?: string;
+  status?: string;   // success | error | skipped
+  index?: number;
+  total?: number;
+  elapsed?: number;
+  summary?: PipelineResult['summary'];
+  state?: Record<string, unknown>;
+  error?: string;
+}
+
+/**
+ * 以 SSE 流式执行全链路，逐节点回调真实进度事件。
+ * 返回 true 表示流式成功并收到 done；false 表示流不可用，调用方应降级到 runPipeline。
+ * 纯函数：不触碰 useDataSource，降级标记由调用方通过 runPipeline 完成。
+ */
+export async function runPipelineStream(
+  req: { category: string; region: string; budget: string; target_country: string; platform: string; target_language: string },
+  onEvent: (e: PipelineStreamEvent) => void,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/pipeline/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok || !res.body) return false;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let gotDone = false;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const frames = buf.split('\n\n');
+      buf = frames.pop() ?? '';
+      for (const frame of frames) {
+        const line = frame.trim();
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (!payload) continue;
+        try {
+          const evt = JSON.parse(payload) as PipelineStreamEvent;
+          onEvent(evt);
+          if (evt.type === 'done') gotDone = true;
+        } catch {
+          /* 忽略半截帧，等待后续数据补齐 */
+        }
+      }
+    }
+    return gotDone;
+  } catch {
+    return false;
+  }
+}
+
 // 政策复制 - 39城列表
 export async function fetchPolicyCities(): Promise<PolicyCitiesResponse> {
   return withSource(
@@ -271,4 +339,29 @@ export async function fetchPolicyCases(): Promise<{ cases: PolicyCaseData[] }> {
     apiFetch<{ cases: PolicyCaseData[] }>('/policy-replication/cases'),
     () => mockPolicyCases(),
   );
+}
+
+// ==================== 系统真实状态（不做 mock 兜底，拿不到即 null） ====================
+
+export interface SystemStatus {
+  service: string;
+  version: string;
+  agents: Record<string, string>;
+  agent_engines: Record<string, string>;
+  llm_configured: boolean;   // AI 增强是否真正生效（后端已配置 LLM_API_KEY）
+  data_mode: string;         // 诚实标注：static-demo = 静态演示数据
+  ai_enhanced_count: number; // 真正接入 LLM 的 Agent 数
+  data_sources: number;
+}
+
+/**
+ * 拉取后端真实系统状态。失败返回 null（由调用方显示"待检测"），
+ * 绝不回退到假数据，避免顶栏"全部在线/AI已接入"说谎。
+ */
+export async function fetchSystemStatus(): Promise<SystemStatus | null> {
+  try {
+    return await apiFetch<SystemStatus>('/status', { timeout: 8000 });
+  } catch {
+    return null;
+  }
 }

@@ -27,14 +27,15 @@ import {
 import CategoryCard from '@/components/CategoryCard';
 import { useStore } from '@/store/useStore';
 
+// engine 与后端 AGENT_ENGINES 一致：llm=真正接入大模型增强，rule=规则/静态数据引擎
 const agents = [
-  { name: '市场洞察', icon: BarChart3, online: true, route: '/market-insight' },
-  { name: '智能选品', icon: Target, online: true, route: '/smart-selection' },
-  { name: '供应链匹配', icon: Truck, online: true, route: '/supply-chain' },
-  { name: '跨境内容生成', icon: FileText, online: true, route: '/content-generation' },
-  { name: '合规助手', icon: Shield, online: true, route: '/compliance' },
-  { name: '智能客服', icon: Headphones, online: true, route: '/customer-service' },
-  { name: '政策复制', icon: Building2, online: true, route: '/policy-replication' },
+  { name: '市场洞察', icon: BarChart3, engine: 'llm' as const, route: '/market-insight' },
+  { name: '智能选品', icon: Target, engine: 'llm' as const, route: '/smart-selection' },
+  { name: '供应链匹配', icon: Truck, engine: 'llm' as const, route: '/supply-chain' },
+  { name: '跨境内容生成', icon: FileText, engine: 'llm' as const, route: '/content-generation' },
+  { name: '合规助手', icon: Shield, engine: 'llm' as const, route: '/compliance' },
+  { name: '智能客服', icon: Headphones, engine: 'llm' as const, route: '/customer-service' },
+  { name: '政策复制', icon: Building2, engine: 'llm' as const, route: '/policy-replication' },
 ];
 
 const categoryData = [
@@ -210,11 +211,11 @@ export default function Home() {
                 <div className="flex items-center gap-1 mt-0.5">
                   <span
                     className={`h-2 w-2 rounded-full ${
-                      agent.online ? 'bg-yiwu-500' : 'bg-gold-500'
+                      agent.engine === 'llm' ? 'bg-yiwu-500' : 'bg-sky-500'
                     }`}
                   />
                   <span className="text-xs text-gray-500">
-                    {agent.online ? '在线' : '开发中'}
+                    {agent.engine === 'llm' ? 'AI增强' : '规则引擎'}
                   </span>
                 </div>
               </div>

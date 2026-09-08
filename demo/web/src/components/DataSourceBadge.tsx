@@ -12,10 +12,10 @@ export default function DataSourceBadge() {
     return (
       <span
         className="flex items-center gap-1.5 rounded-full border border-yiwu-500/30 bg-yiwu-500/10 px-2.5 py-0.5 text-xs text-yiwu-400"
-        title="后端 API + AI 大模型实时返回"
+        title="后端 API 实时返回（AI 增强是否生效见顶栏状态）"
       >
         <Zap size={12} />
-        实时数据 · AI 已接入
+        实时后端数据
       </span>
     );
   }

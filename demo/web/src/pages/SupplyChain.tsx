@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   ChevronDown, Loader2, Building2, Package, FileCheck,
-  Train, ShieldCheck, CheckCircle2, Circle, Star,
+  Train, ShieldCheck, CheckCircle2, Circle, Star, Sparkles,
 } from 'lucide-react';
 import { categories } from '@/store/useStore';
 import { fetchSupplyChain, fetchYixinouLogistics, type SupplyChainData, type LogisticsData } from '@/utils/api';
@@ -298,6 +298,16 @@ export default function SupplyChain() {
           </div>
         </div>
       </div>
+
+      {/* AI 采购与物流策略建议（后端 LLM 增强，ai_used=true 时返回） */}
+      {data.ai_recommendation && (
+        <div className="glass-light rounded-xl p-6 border border-yiwu-500/20">
+          <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+            <Sparkles size={16} className="text-yiwu-400" /> AI 采购与物流策略建议
+          </h3>
+          <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">{data.ai_recommendation}</p>
+        </div>
+      )}
     </motion.div>
   );
 }
