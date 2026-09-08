@@ -187,8 +187,9 @@ class TestAuthRoutes:
             "email": "wrong@example.com",
             "password": "incorrect",
         })
-        data = resp.json()
-        assert data["success"] is False
+        # P2-3: 登录失败返回 401（REST 规范），不再 200+success:false
+        assert resp.status_code == 401
+        assert "detail" in resp.json()
 
 
 # ==================== 系统监控 ====================

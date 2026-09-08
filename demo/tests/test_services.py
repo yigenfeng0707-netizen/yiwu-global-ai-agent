@@ -4,7 +4,7 @@ import os
 import time
 import pytest
 import tempfile
-from app.services.auth import AuthService, _hash_password
+from app.services.auth import AuthService, _hash_password, _verify_password
 from app.services.llm import LLMService
 from app.models.schemas import (
     ContentGenerateRequest, CustomerChatRequest, TariffCalcRequest,
@@ -68,10 +68,15 @@ class TestAuthService:
         assert payload["email"] == "verify@test.com"
 
     def test_password_hash(self):
+        # P2-4: 密码哈希升级为 bcrypt(随机盐)，校验走 _verify_password；每次哈希不同属正常
         h1 = _hash_password("test")
-        h2 = _hash_password("test")
-        assert h1 == h2
-        assert _hash_password("different") != h1
+        assert h1.startswith(("bcrypt$", "sha256$"))
+        assert _verify_password("test", h1) is True
+        assert _verify_password("wrong", h1) is False
+        # legacy 静态盐 SHA256 向后兼容（P2 前的老用户仍可登录）
+        import hashlib
+        legacy = hashlib.sha256("yiwu-chuhai:test".encode()).hexdigest()
+        assert _verify_password("test", legacy) is True
 
 
 # ==================== LLM服务 ====================

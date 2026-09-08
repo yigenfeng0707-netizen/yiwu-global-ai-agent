@@ -2,7 +2,7 @@
 
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from ..agents.market_insight import MarketInsightAgent
@@ -317,6 +317,8 @@ async def register(req: RegisterRequest):
 async def login(req: LoginRequest):
     """登录"""
     result = auth_service.login(email=req.email, password=req.password)
+    if not result.get("success"):
+        raise HTTPException(status_code=401, detail=result.get("detail", "邮箱或密码错误"))
     return result
 
 

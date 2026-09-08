@@ -4,9 +4,9 @@ import os
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from .api.routes import router
 from .middleware.auth import AuthMiddleware
@@ -34,8 +34,11 @@ else:
     allow_credentials = False
 
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=allow_credentials, allow_methods=["*"], allow_headers=["*"])
-app.add_middleware(AuthMiddleware)
+# 中间件执行顺序（Starlette 中后注册者先执行）：Signature → Auth → RateLimit → CORS
+# 关键修正：Auth 必须先于 RateLimit 执行，RateLimit 才能读到 request.state.user 做认证用户差异化限流。
+# （此前 Auth 在 RateLimit 之前注册 → 执行时 RateLimit 先跑、user 恒为空、认证限流是死代码）
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(AuthMiddleware)
 app.add_middleware(SignatureMiddleware)
 
 
@@ -56,13 +59,38 @@ def _log_security_posture() -> None:
 
 _log_security_posture()
 
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """统一未处理异常：记录日志并返回一致的 JSON 错误结构（避免堆栈泄露给客户端）。"""
+    logger.error("未处理异常 %s: %s", request.url.path, exc, exc_info=True)
+    return JSONResponse(status_code=500, content={"detail": "服务器内部错误", "path": request.url.path})
+
+
 # 注册路由
 app.include_router(router, prefix="/api/v1")
 
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "service": "yiwu-chuhai-api"}
+    """健康检查：真实探测 DB 连接与 LLM 配置（供 Docker HEALTHCHECK / 魔搭 keepalive / 部署冒烟）。
+    HTTP 始终 200（进程存活即 200，保持 keepalive/冒烟判断不变），status 字段反映 healthy/degraded。"""
+    checks: dict = {"service": "yiwu-chuhai-api", "version": "2.0.0"}
+    try:
+        from .db.database import get_db
+        get_db().get_user_count()  # 轻量查询验证数据库连接
+        checks["database"] = "ok"
+    except Exception as e:
+        checks["database"] = "error"
+        logger.warning("健康检查：数据库探测失败: %s", e)
+    try:
+        from .services.llm import llm_service
+        checks["llm_configured"] = bool(llm_service.api_key)
+    except Exception:
+        checks["llm_configured"] = False
+    checks["data_mode"] = "static-demo"
+    checks["status"] = "healthy" if checks["database"] == "ok" else "degraded"
+    return checks
 
 
 if WEB_DIST.is_dir():

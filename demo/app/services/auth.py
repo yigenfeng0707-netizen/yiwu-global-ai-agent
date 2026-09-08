@@ -14,9 +14,37 @@ from ..db.database import get_db
 logger = logging.getLogger(__name__)
 
 
-def _hash_password(password: str, salt: str = "yiwu-chuhai") -> str:
-    """密码哈希（SHA256 + salt）"""
-    return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+# bcrypt 优先；未安装时降级为 SHA256 + per-user 随机盐（均优于原静态盐）
+try:
+    import bcrypt as _bcrypt
+    _BCRYPT = True
+except ImportError:
+    _BCRYPT = False
+
+
+def _hash_password(password: str) -> str:
+    """密码哈希：bcrypt（自带随机盐）优先；降级 SHA256+per-user随机盐。输出带算法前缀。"""
+    if _BCRYPT:
+        return "bcrypt$" + _bcrypt.hashpw(password.encode(), _bcrypt.gensalt()).decode()
+    salt = secrets.token_hex(8)
+    h = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+    return f"sha256${salt}${h}"
+
+
+def _verify_password(password: str, stored: str) -> bool:
+    """校验密码，兼容 bcrypt / sha256$随机盐 / legacy静态盐SHA256 三种历史格式。"""
+    if not stored:
+        return False
+    if stored.startswith("bcrypt$"):
+        return bool(_BCRYPT) and _bcrypt.checkpw(password.encode(), stored[7:].encode())
+    if stored.startswith("sha256$"):
+        try:
+            _, salt, h = stored.split("$", 2)
+        except ValueError:
+            return False
+        return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest() == h
+    # legacy：静态盐 SHA256（P2 之前注册的老用户）
+    return hashlib.sha256(f"yiwu-chuhai:{password}".encode()).hexdigest() == stored
 
 
 class AuthService:
@@ -49,8 +77,7 @@ class AuthService:
         if not user:
             return {"success": False, "detail": "邮箱或密码错误"}
 
-        password_hash = _hash_password(password)
-        if user["password_hash"] != password_hash:
+        if not _verify_password(password, user["password_hash"]):
             return {"success": False, "detail": "邮箱或密码错误"}
 
         if not user.get("is_active", 1):
