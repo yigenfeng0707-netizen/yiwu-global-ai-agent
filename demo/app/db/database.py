@@ -80,10 +80,21 @@ class Database:
                     created_at REAL NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS real_data_cache (
+                    source TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL,
+                    is_real INTEGER DEFAULT 0,
+                    fetched_at REAL DEFAULT 0,
+                    source_url TEXT DEFAULT '',
+                    error TEXT DEFAULT '',
+                    updated_at REAL NOT NULL
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
                 CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(session_id);
                 CREATE INDEX IF NOT EXISTS idx_api_usage_time ON api_usage(created_at);
                 CREATE INDEX IF NOT EXISTS idx_query_history_time ON query_history(created_at);
+                CREATE INDEX IF NOT EXISTS idx_real_data_updated ON real_data_cache(updated_at);
             """)
 
     # ==================== 用户管理 ====================
@@ -220,6 +231,72 @@ class Database:
                     "SELECT * FROM query_history ORDER BY created_at DESC LIMIT ?", (limit,)
                 ).fetchall()
             return [dict(r) for r in rows]
+
+    # ==================== 真实数据源缓存（P1-1 ETL） ====================
+
+    def save_real_data(self, result: Dict[str, Any]):
+        """UPSERT 一条真实数据源抓取结果（FetchResult.to_dict()）。
+
+        进程重启后可从本表回退到"上次成功值"，避免单次抓取失败导致数据空洞。
+        """
+        source = result.get("source", "")
+        if not source:
+            return
+        with self._get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO real_data_cache
+                    (source, payload_json, is_real, fetched_at, source_url, error, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(source) DO UPDATE SET
+                    payload_json = excluded.payload_json,
+                    is_real      = excluded.is_real,
+                    fetched_at   = excluded.fetched_at,
+                    source_url   = excluded.source_url,
+                    error        = excluded.error,
+                    updated_at   = excluded.updated_at
+                """,
+                (
+                    source,
+                    json.dumps(result, ensure_ascii=False),
+                    1 if result.get("is_real") else 0,
+                    result.get("fetched_at", 0) or 0,
+                    result.get("source_url", ""),
+                    result.get("error", ""),
+                    time.time(),
+                ),
+            )
+
+    def get_real_data(self, source: str) -> Optional[Dict[str, Any]]:
+        """按源标识取最近落库结果（含 payload），无则 None。"""
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM real_data_cache WHERE source = ?", (source,)
+            ).fetchone()
+            if not row:
+                return None
+            record = dict(row)
+            try:
+                record["payload"] = json.loads(record.get("payload_json") or "{}")
+            except (ValueError, TypeError):
+                record["payload"] = {}
+            return record
+
+    def get_all_real_data(self) -> List[Dict[str, Any]]:
+        """取全部真实数据源缓存（按更新时间倒序），用于 /data-sources 状态汇总。"""
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM real_data_cache ORDER BY updated_at DESC"
+            ).fetchall()
+            out: List[Dict[str, Any]] = []
+            for r in rows:
+                record = dict(r)
+                try:
+                    record["payload"] = json.loads(record.get("payload_json") or "{}")
+                except (ValueError, TypeError):
+                    record["payload"] = {}
+                out.append(record)
+            return out
 
 
 # 全局数据库实例（懒加载）

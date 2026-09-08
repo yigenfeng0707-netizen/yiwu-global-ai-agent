@@ -3,12 +3,17 @@
 import random
 from typing import Dict, List, Any
 
+from .etl import get_registry, DataSourceStatus
+
 
 class DataSourceBase:
     """数据源基类"""
 
     name: str = "base"
     description: str = ""
+    # P1-1 三态标注：real(真实接入) / demo(演示数据) / planned(规划中)
+    status: str = DataSourceStatus.DEMO
+    is_real: bool = False
 
     def fetch(self, category: str, region: str = "") -> Dict[str, Any]:
         raise NotImplementedError
@@ -96,13 +101,44 @@ class YiwuMarketDataSource(DataSourceBase):
 
     def fetch(self, category: str, region: str = "") -> Dict[str, Any]:
         products = self.CATEGORY_PRODUCTS.get(category, [])
+        # P1-1：义乌指数改由真实源（ywindex.com 官方发布值）提供，去除 random 伪造
+        reg = get_registry()
+        real = reg.get_index_for_category(category)
+        if real.get("is_real"):
+            market_index = real["index_value"]
+            index_meta = {
+                "is_real": True,
+                "scale": real.get("scale", "官方千点基准"),
+                "as_of": real.get("as_of", ""),
+                "category_matched": real.get("category_matched", ""),
+                "change_pct": real.get("change_pct"),
+                "source_url": real.get("source_url", ""),
+                "fetched_at_iso": real.get("fetched_at_iso", ""),
+                "excerpt": real.get("excerpt", ""),
+                "note": real.get("note", ""),
+            }
+        else:
+            # 真实源不可用：回退稳定演示基准值（非 random），并诚实标注
+            from .market_data import YIWU_INDEX
+            market_index = YIWU_INDEX["categories"].get(category, YIWU_INDEX["current"])
+            index_meta = {
+                "is_real": False,
+                "scale": "演示基准(98-110)",
+                "as_of": "",
+                "source_url": "",
+                "fetched_at_iso": "",
+                "note": real.get("note") or "义乌指数真实源不可用，回退演示基准值",
+            }
         return {
             "source": self.name,
             "category": category,
             "products": products,
+            # 商户/SKU 总量为官方宣传口径的演示静态值（非实时抓取）
             "total_shops": 75000,
             "total_skus": 2100000,
-            "market_index": round(random.uniform(98, 110), 1),
+            "static_demo_fields": ["total_shops", "total_skus", "products"],
+            "market_index": market_index,
+            "market_index_meta": index_meta,
         }
 
 
@@ -145,10 +181,11 @@ class YixinouLogisticsDataSource(DataSourceBase):
 
 
 class AmazonDataSource(DataSourceBase):
-    """Amazon平台数据源"""
+    """Amazon平台数据源（接入规划中，当前为演示占位）"""
 
     name = "Amazon"
-    description = "Amazon全球平台销售数据"
+    description = "Amazon全球平台销售数据（接入规划中，当前为演示占位数据，非真实平台数据）"
+    status = DataSourceStatus.PLANNED
 
     def fetch(self, category: str, region: str = "") -> Dict[str, Any]:
         base_prices = {
@@ -161,6 +198,8 @@ class AmazonDataSource(DataSourceBase):
         return {
             "source": self.name,
             "category": category,
+            "is_real": False,
+            "data_status": "planned-demo",
             "avg_selling_price": f"${price_range[0]}-{price_range[1]}",
             "competition_level": random.choice(["高", "中", "中高"]),
             "monthly_search_volume": f"{random.randint(10, 500)}K",
@@ -170,15 +209,18 @@ class AmazonDataSource(DataSourceBase):
 
 
 class AlibabaDataSource(DataSourceBase):
-    """Alibaba.com数据源"""
+    """Alibaba.com数据源（接入规划中，当前为演示占位）"""
 
     name = "Alibaba.com"
-    description = "Alibaba.com国际站B2B数据"
+    description = "Alibaba.com国际站B2B数据（接入规划中，当前为演示占位数据，非真实平台数据）"
+    status = DataSourceStatus.PLANNED
 
     def fetch(self, category: str, region: str = "") -> Dict[str, Any]:
         return {
             "source": self.name,
             "category": category,
+            "is_real": False,
+            "data_status": "planned-demo",
             "supplier_count": random.randint(500, 5000),
             "avg_moq": f"{random.randint(50, 500)}件",
             "price_range": f"${random.randint(1, 10)}-${random.randint(15, 50)}",
@@ -190,7 +232,8 @@ class IndustryReportDataSource(DataSourceBase):
     """行业报告数据源"""
 
     name = "行业报告"
-    description = "义乌指数及行业研究报告"
+    description = "义乌指数及行业研究报告（义乌指数已接真实源，行业规模为演示静态值）"
+    status = DataSourceStatus.DEMO
 
     REPORTS = {
         "日用百货": {"market_size": "580亿美元", "growth": "12.5%", "trend": "稳步增长"},
@@ -207,11 +250,41 @@ class IndustryReportDataSource(DataSourceBase):
 
     def fetch(self, category: str, region: str = "") -> Dict[str, Any]:
         report = self.REPORTS.get(category, {})
+        # P1-1：义乌指数改由真实源提供，去除 random 伪造
+        reg = get_registry()
+        real = reg.get_index_for_category(category)
+        if real.get("is_real"):
+            yiwu_index = real["index_value"]
+            index_meta = {
+                "is_real": True,
+                "scale": real.get("scale", "官方千点基准"),
+                "as_of": real.get("as_of", ""),
+                "category_matched": real.get("category_matched", ""),
+                "change_pct": real.get("change_pct"),
+                "source_url": real.get("source_url", ""),
+                "fetched_at_iso": real.get("fetched_at_iso", ""),
+                "excerpt": real.get("excerpt", ""),
+                "note": real.get("note", ""),
+            }
+        else:
+            from .market_data import YIWU_INDEX
+            yiwu_index = YIWU_INDEX["categories"].get(category, YIWU_INDEX["current"])
+            index_meta = {
+                "is_real": False,
+                "scale": "演示基准(98-110)",
+                "as_of": "",
+                "source_url": "",
+                "fetched_at_iso": "",
+                "note": real.get("note") or "义乌指数真实源不可用，回退演示基准值",
+            }
         return {
             "source": self.name,
             "category": category,
             **report,
-            "yiwu_index": round(random.uniform(98, 110), 1),
+            # 行业规模/增速为演示静态值（非实时抓取）
+            "static_demo_fields": ["market_size", "growth", "trend"],
+            "yiwu_index": yiwu_index,
+            "yiwu_index_meta": index_meta,
         }
 
 
@@ -251,5 +324,30 @@ class DataSourceManager:
             return source.fetch(category, region)
         return None
 
-    def list_sources(self) -> List[Dict[str, str]]:
-        return [{"name": s.name, "description": s.description} for s in self.sources.values()]
+    def list_sources(self) -> List[Dict[str, Any]]:
+        return [
+            {"name": s.name, "description": s.description, "status": s.status, "is_real": s.is_real}
+            for s in self.sources.values()
+        ]
+
+    def list_all_sources(self) -> List[Dict[str, Any]]:
+        """完整数据源三态清单：legacy 5 源 + etl 真实源（带新鲜度溯源）。
+
+        供 /data-sources 与前端徽章如实展示"哪些真实接入/演示/规划中"。
+        """
+        legacy = self.list_sources()
+        try:
+            real = get_registry().status()
+        except Exception:  # noqa: BLE001 - registry 不可用时只返回 legacy
+            real = []
+        # 去重：registry.status 已含 legacy 声明，这里以 registry 为主、legacy 补充
+        real_keys = {r.get("name") for r in real}
+        merged = list(real)
+        for item in legacy:
+            if item["name"] not in real_keys:
+                merged.append({
+                    "name": item["name"], "key": item["name"], "status": item["status"],
+                    "description": item["description"], "is_real": item["is_real"],
+                    "source_url": "", "fetched_at_iso": "", "age_seconds": None,
+                })
+        return merged

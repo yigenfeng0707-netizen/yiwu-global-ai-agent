@@ -56,8 +56,18 @@ class TestBasicRoutes:
         resp = await client.get("/api/v1/yiwu-index")
         assert resp.status_code == 200
         data = resp.json()
-        assert "current" in data
-        assert "trend" in data
+        # P1-1：诚实拆分为 演示基准 + 官方发布真实值 + 实时汇率 三段
+        assert "demo_composite" in data
+        assert "official_published" in data
+        assert "exchange_rate" in data
+        # 演示基准段保留旧字段（向后兼容）
+        assert "current" in data["demo_composite"]
+        assert "trend" in data["demo_composite"]
+        assert data["demo_composite"]["is_real"] is False
+        # 官方发布段带溯源结构（不依赖 live 网络，仅校验字段存在）
+        assert "is_real" in data["official_published"]
+        assert "records" in data["official_published"]
+        assert "source_url" in data["official_published"]
 
 
 # ==================== 业务接口 ====================

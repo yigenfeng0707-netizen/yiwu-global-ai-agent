@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from .base import BaseAgent
 from ..data.market_data import MARKET_DATA, CATEGORY_LIST, SUPPORTED_REGIONS, YIWU_INDEX
 from ..data.sources import DataSourceManager
+from ..data.etl import get_registry
 
 
 class MarketInsightAgent(BaseAgent):
@@ -51,12 +52,22 @@ class MarketInsightAgent(BaseAgent):
         # 风险预警
         risks = self._get_risks(category, region)
 
-        # 义乌指数
+        # 义乌指数（P1-1：演示基准 + 官方发布真实值 + 实时汇率，均带溯源）
+        reg = get_registry()
+        official = reg.get_index_for_category(category)
+        fx = reg.get_exchange_rate("CNY")
         yiwu_index = {
+            # 演示基准（向后兼容前端旧字段）
             "current": YIWU_INDEX["current"],
             "change": YIWU_INDEX["change"],
             "trend": YIWU_INDEX["trend"],
             "category_score": YIWU_INDEX["categories"].get(category, 100),
+            "demo_scale": "演示基准(98-110)，非实时",
+            # 真实官方发布值（千点基准·定期更新）
+            "is_real": bool(official.get("is_real")),
+            "official": official,
+            # 实时汇率（每日参考汇率）
+            "exchange_rate": fx,
         }
 
         # 数据源

@@ -15,6 +15,7 @@ from ..agents.policy_replication_agent import PolicyReplicationAgent
 from ..agents.workflow import CrossBorderWorkflow, WorkflowState
 from ..data.market_data import CATEGORY_LIST, SUPPORTED_REGIONS, YIWU_INDEX, YIXINOU_DATA, YIWU_TRADE_CITY
 from ..data.sources import DataSourceManager
+from ..data.etl import get_registry
 from ..models.schemas import (
     ContentGenerateRequest, CustomerChatRequest, TariffCalcRequest,
     LoginRequest, RegisterRequest, PipelineRequest, SupplyChainRequest, LogisticsRequest,
@@ -96,14 +97,65 @@ async def get_regions():
 
 @router.get("/data-sources")
 async def get_data_sources():
-    """获取数据源列表"""
-    return {"sources": data_manager.list_sources()}
+    """获取数据源三态清单（real 真实接入 / demo 演示 / planned 规划中，含新鲜度溯源）"""
+    sources = data_manager.list_all_sources()
+    return {
+        "sources": sources,
+        "real_count": sum(1 for s in sources if s.get("is_real")),
+        "total": len(sources),
+        "note": "real=已接入真实外部数据管道（带时间戳可自证）；demo=静态演示数据；planned=接入规划中",
+    }
+
+
+@router.post("/data-sources/refresh")
+async def refresh_data_sources(force: bool = True):
+    """手动触发真实数据源刷新（答辩现场可演示真实请求-响应）。
+
+    返回各源刷新结果：is_real / 数据年龄 / 失败原因。
+    """
+    reg = get_registry()
+    results = reg.refresh(force=force)
+    return {
+        "refreshed": [r.to_dict() for r in results.values()],
+        "real_count": reg.real_count(),
+        "total_real_sources": len(reg.source_names),
+    }
 
 
 @router.get("/yiwu-index")
 async def get_yiwu_index():
-    """获取义乌指数"""
-    return YIWU_INDEX
+    """获取义乌指数：演示基准值 + 官方发布真实值 + 实时汇率（均带溯源）。
+
+    诚实拆分（修复"102.8 常量冒充实时"痛点）：
+      - demo_composite：旧演示基准（98-110 标度），明确 is_real=false；
+      - official_published：义乌指数官网官方发布值（千点基准·定期更新），is_real=true 时带 as_of/source_url；
+      - exchange_rate：open.er-api.com 每日参考汇率（USD/CNY 等），is_real=true 时带官方更新时间戳。
+    """
+    reg = get_registry()
+    official = reg.get_data("yiwu_index")
+    official_meta = reg.get_meta("yiwu_index")
+    fx = reg.get_exchange_rate("CNY")
+    return {
+        "demo_composite": {
+            **YIWU_INDEX,
+            "is_real": False,
+            "scale": "演示基准(98-110)",
+            "note": "演示用综合基准值，非实时；真实官方发布值见 official_published",
+        },
+        "official_published": {
+            "is_real": bool(official_meta.get("is_real")),
+            "index_type": (official or {}).get("index_type", "义乌中国小商品指数（官方发布值）"),
+            "index_scale": (official or {}).get("index_scale", "官方千点基准"),
+            "update_mode": (official or {}).get("update_mode", "定期更新（官方发布，非实时面板）"),
+            "records": (official or {}).get("records", []),
+            "record_count": (official or {}).get("record_count", 0),
+            "source_url": official_meta.get("source_url", ""),
+            "fetched_at_iso": official_meta.get("fetched_at_iso", ""),
+            "age_seconds": official_meta.get("age_seconds"),
+            "error": official_meta.get("error", ""),
+        },
+        "exchange_rate": fx,
+    }
 
 
 @router.get("/yiwu-trade-city")
@@ -327,6 +379,22 @@ async def login(req: LoginRequest):
 @router.get("/status")
 async def get_status():
     """系统状态（可自证的真实健康态）"""
+    reg = get_registry()
+    real_sources = []
+    for name in reg.source_names:
+        meta = reg.get_meta(name)
+        real_sources.append({
+            "source": name,
+            "is_real": bool(meta.get("is_real")),
+            "age_seconds": meta.get("age_seconds"),
+            "is_fresh": meta.get("is_fresh"),
+            "source_url": meta.get("source_url", ""),
+            "fetched_at_iso": meta.get("fetched_at_iso", ""),
+            "error": meta.get("error", ""),
+        })
+    real_count = sum(1 for s in real_sources if s["is_real"])
+    # 诚实标注数据模式：有真实源接入为 hybrid，全不可用回退 static-demo
+    data_mode = f"hybrid({real_count}real)" if real_count else "static-demo"
     return {
         "service": "yiwu-chuhai-api",
         "version": "2.0.0",
@@ -341,8 +409,11 @@ async def get_status():
         },
         # 诚实标注：AI 增强是否真正生效（取决于是否配置 LLM_API_KEY）
         "llm_configured": bool(llm_service.api_key),
-        # 诚实标注：当前数据源为静态演示数据，非实时接入的外部数据管道
-        "data_mode": "static-demo",
+        # 诚实标注：数据模式（hybrid=已接入真实源 / static-demo=全演示）
+        "data_mode": data_mode,
+        # 真实数据源逐源状态（可自证：带 source_url 与数据年龄）
+        "real_data_sources": real_sources,
+        "real_source_count": real_count,
         # 各 Agent 引擎类型（llm-enhanced / rule-based）
         "agent_engines": AGENT_ENGINES,
         "ai_enhanced_count": sum(1 for e in AGENT_ENGINES.values() if e == "llm-enhanced"),

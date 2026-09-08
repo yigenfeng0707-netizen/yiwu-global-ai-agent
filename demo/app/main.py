@@ -63,6 +63,22 @@ def _log_security_posture() -> None:
 _log_security_posture()
 
 
+def _warm_real_data_sources() -> None:
+    """P1-1 启动预热：后台刷新真实数据源（汇率/义乌指数官方发布值）。
+
+    best-effort、非阻塞：抓取失败不影响应用启动，接口会回退 DB 上次成功值或演示基准。
+    """
+    try:
+        from .data.etl import get_registry
+        get_registry().warm(block=False)
+        logger.info("[ETL预热] 真实数据源后台刷新已启动")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[ETL预热] 启动失败（不影响服务）：%s", e)
+
+
+_warm_real_data_sources()
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """统一未处理异常：记录日志并返回一致的 JSON 错误结构（避免堆栈泄露给客户端）。"""
@@ -91,7 +107,14 @@ async def health():
         checks["llm_configured"] = bool(llm_service.api_key)
     except Exception:
         checks["llm_configured"] = False
-    checks["data_mode"] = "static-demo"
+    # P1-1：数据模式如实反映真实源接入情况（registry 不可用时安全回退）
+    try:
+        from .data.etl import get_registry
+        real_count = get_registry().real_count()
+    except Exception:
+        real_count = 0
+    checks["real_source_count"] = real_count
+    checks["data_mode"] = f"hybrid({real_count}real)" if real_count else "static-demo"
     checks["status"] = "healthy" if checks["database"] == "ok" else "degraded"
     return checks
 
