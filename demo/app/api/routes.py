@@ -23,7 +23,7 @@ from ..models.schemas import (
 )
 from ..services.auth import auth_service
 from ..services.llm import llm_service
-from ..cache import cache
+from ..cache import cache, cached
 
 router = APIRouter()
 
@@ -84,14 +84,16 @@ async def get_agents_info():
 
 
 @router.get("/categories")
+@cached(ttl=3600)
 async def get_categories():
-    """获取品类列表"""
+    """获取品类列表（静态常量，缓存1小时）"""
     return {"categories": CATEGORY_LIST}
 
 
 @router.get("/regions")
+@cached(ttl=3600)
 async def get_regions():
-    """获取目标市场区域"""
+    """获取目标市场区域（静态常量，缓存1小时）"""
     return {"regions": SUPPORTED_REGIONS}
 
 

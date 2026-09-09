@@ -124,7 +124,7 @@ export default function Layout() {
             {isAuthenticated ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400">{user?.email}</span>
-                <button onClick={logout} className="ml-auto text-gray-500 hover:text-white">
+                <button onClick={logout} aria-label="退出登录" title="退出登录" className="ml-auto text-gray-500 hover:text-white">
                   <LogOut size={14} />
                 </button>
               </div>

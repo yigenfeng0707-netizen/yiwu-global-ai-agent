@@ -237,18 +237,46 @@ export const mockCompliance = (category: string, target_country: string) => ({
   },
 });
 
-// ==================== 关税计算 Mock ====================
-export const mockTariff = (product_value: number) => ({
-  product_value,
-  tariff_rate: '8%',
-  tariff_amount: Math.round(product_value * 0.08),
-  vat_rate: '19%',
-  vat_amount: Math.round(product_value * 0.19),
-  import_tax: Math.round(product_value * 0.03),
-  total_tax: Math.round(product_value * 0.08 + product_value * 0.19 + product_value * 0.03),
-  total_cost: Math.round(product_value * 1.3),
-  rcep_benefits: null,
-});
+// ==================== 关税计算 Mock（按目标国家取税率） ====================
+// 代表性税率（演示用，非实时海关税则）：tariff=关税率, vat=增值税/消费税率, rcep=是否RCEP成员享优惠
+const TARIFF_TABLE: Record<string, { tariff: number; vat: number; rcep: boolean }> = {
+  德国: { tariff: 0.08, vat: 0.19, rcep: false },
+  法国: { tariff: 0.08, vat: 0.20, rcep: false },
+  西班牙: { tariff: 0.08, vat: 0.21, rcep: false },
+  荷兰: { tariff: 0.08, vat: 0.21, rcep: false },
+  波兰: { tariff: 0.08, vat: 0.23, rcep: false },
+  哈萨克斯坦: { tariff: 0.10, vat: 0.12, rcep: false },
+  乌兹别克斯坦: { tariff: 0.10, vat: 0.12, rcep: false },
+  沙特阿拉伯: { tariff: 0.05, vat: 0.15, rcep: false },
+  阿联酋: { tariff: 0.05, vat: 0.05, rcep: false },
+  伊朗: { tariff: 0.15, vat: 0.10, rcep: false },
+  土耳其: { tariff: 0.10, vat: 0.20, rcep: false },
+  印尼: { tariff: 0.05, vat: 0.11, rcep: true },
+  泰国: { tariff: 0.05, vat: 0.07, rcep: true },
+  越南: { tariff: 0.05, vat: 0.10, rcep: true },
+  马来西亚: { tariff: 0.05, vat: 0.08, rcep: true },
+};
+
+export const mockTariff = (product_value: number, target_country: string = '德国') => {
+  const cfg = TARIFF_TABLE[target_country] || { tariff: 0.08, vat: 0.15, rcep: false };
+  const tariffAmount = Math.round(product_value * cfg.tariff);
+  const vatAmount = Math.round(product_value * cfg.vat);
+  const importTax = Math.round(product_value * 0.03);
+  const totalTax = tariffAmount + vatAmount + importTax;
+  return {
+    product_value,
+    tariff_rate: `${Math.round(cfg.tariff * 100)}%`,
+    tariff_amount: tariffAmount,
+    vat_rate: `${Math.round(cfg.vat * 100)}%`,
+    vat_amount: vatAmount,
+    import_tax: importTax,
+    total_tax: totalTax,
+    total_cost: product_value + totalTax,
+    rcep_benefits: cfg.rcep
+      ? `RCEP 协定项下关税减让：${target_country} 为 RCEP 成员，享优惠税率（关税已按协定税率计）`
+      : null,
+  };
+};
 
 // ==================== 客服 Mock ====================
 export const mockChatResponse = (message: string, category: string) => ({
@@ -415,16 +443,43 @@ export const mockPolicyCities = () => ({
   cities: [
     { city: '义乌', province: '浙江', approved_year: '2013', main_categories: '日用百货、饰品配件、玩具、工艺品', policy_benefits: '增值税免征、简化申报、通关便利化', customs_code: '3313' },
     { city: '海宁', province: '浙江', approved_year: '2016', main_categories: '皮革制品、经编面料、袜子', policy_benefits: '增值税免征、简化申报、跨境人民币结算', customs_code: '3314' },
-    { city: '广州', province: '广东', approved_year: '2016', main_categories: '服装、皮具、电子产品', policy_benefits: '增值税免征、简化申报、广交会资源', customs_code: '4401' },
-    { city: '深圳', province: '广东', approved_year: '2016', main_categories: '电子产品、智能硬件、珠宝', policy_benefits: '增值税免征、简化申报、前海政策叠加', customs_code: '4403' },
-    { city: '成都', province: '四川', approved_year: '2016', main_categories: '鞋类、家具、茶叶', policy_benefits: '增值税免征、简化申报、中欧班列直达', customs_code: '5101' },
-    { city: '重庆', province: '重庆', approved_year: '2016', main_categories: '汽摩配件、电子产品、农产品', policy_benefits: '增值税免征、简化申报、渝新欧班列直达', customs_code: '5001' },
+    { city: '绍兴柯桥', province: '浙江', approved_year: '2016', main_categories: '纺织面料、家纺产品、服装', policy_benefits: '增值税免征、简化申报、组柜拼箱', customs_code: '3315' },
+    { city: '湖州织里', province: '浙江', approved_year: '2016', main_categories: '童装、棉布、床上用品', policy_benefits: '增值税免征、简化申报、在线收结汇', customs_code: '3316' },
+    { city: '台州路桥', province: '浙江', approved_year: '2016', main_categories: '塑料制品、汽摩配件、缝制设备', policy_benefits: '增值税免征、简化申报、信用担保', customs_code: '3317' },
+    { city: '温州瓯海', province: '浙江', approved_year: '2016', main_categories: '鞋类、眼镜、服装', policy_benefits: '增值税免征、简化申报、出口信用保险', customs_code: '3318' },
+    { city: '宁波江北', province: '浙江', approved_year: '2016', main_categories: '小家电、文具、五金', policy_benefits: '增值税免征、简化申报、港口直通', customs_code: '3319' },
+    { city: '嘉兴平湖', province: '浙江', approved_year: '2016', main_categories: '箱包、服装、童车', policy_benefits: '增值税免征、简化申报、产地直采', customs_code: '3320' },
+    { city: '杭州萧山', province: '浙江', approved_year: '2016', main_categories: '羽绒制品、花边刺绣、伞具', policy_benefits: '增值税免征、简化申报、数字贸易', customs_code: '3321' },
+    { city: '金华永康', province: '浙江', approved_year: '2016', main_categories: '五金工具、防盗门、保温杯', policy_benefits: '增值税免征、简化申报、品牌出海', customs_code: '3322' },
     { city: '泉州', province: '福建', approved_year: '2016', main_categories: '鞋服、石材、工艺品', policy_benefits: '增值税免征、简化申报、对台贸易便利', customs_code: '3505' },
     { city: '厦门', province: '福建', approved_year: '2016', main_categories: '电子产品、石材、茶叶', policy_benefits: '增值税免征、简化申报、自贸区叠加优惠', customs_code: '3502' },
+    { city: '广州', province: '广东', approved_year: '2016', main_categories: '服装、皮具、电子产品', policy_benefits: '增值税免征、简化申报、广交会资源', customs_code: '4401' },
+    { city: '深圳', province: '广东', approved_year: '2016', main_categories: '电子产品、智能硬件、珠宝', policy_benefits: '增值税免征、简化申报、前海政策叠加', customs_code: '4403' },
+    { city: '佛山', province: '广东', approved_year: '2016', main_categories: '陶瓷、家具、家电', policy_benefits: '增值税免征、简化申报、产业集群优势', customs_code: '4406' },
+    { city: '东莞', province: '广东', approved_year: '2016', main_categories: '电子元器件、玩具、家具', policy_benefits: '增值税免征、简化申报、加工贸易转型', customs_code: '4419' },
+    { city: '中山', province: '广东', approved_year: '2016', main_categories: '灯饰、五金、家电', policy_benefits: '增值税免征、简化申报、古镇灯都资源', customs_code: '4420' },
+    { city: '汕头', province: '广东', approved_year: '2016', main_categories: '玩具、内衣、工艺品', policy_benefits: '增值税免征、简化申报、侨乡资源', customs_code: '4405' },
+    { city: '成都', province: '四川', approved_year: '2016', main_categories: '鞋类、家具、茶叶', policy_benefits: '增值税免征、简化申报、中欧班列直达', customs_code: '5101' },
+    { city: '重庆', province: '重庆', approved_year: '2016', main_categories: '汽摩配件、电子产品、农产品', policy_benefits: '增值税免征、简化申报、渝新欧班列直达', customs_code: '5001' },
+    { city: '昆明', province: '云南', approved_year: '2016', main_categories: '花卉、茶叶、珠宝', policy_benefits: '增值税免征、简化申报、面向南亚东南亚', customs_code: '5301' },
+    { city: '南宁', province: '广西', approved_year: '2016', main_categories: '农产品、建材、轻工产品', policy_benefits: '增值税免征、简化申报、面向东盟', customs_code: '4501' },
     { city: '长沙', province: '湖南', approved_year: '2016', main_categories: '工程机械配件、烟花鞭炮、茶叶', policy_benefits: '增值税免征、简化申报、湘欧快线', customs_code: '4301' },
-    { city: '西安', province: '陕西', approved_year: '2016', main_categories: '农产品、工艺品、机械设备', policy_benefits: '增值税免征、简化申报、长安号班列', customs_code: '6101' },
+    { city: '南昌', province: '江西', approved_year: '2016', main_categories: '纺织品、陶瓷、农产品', policy_benefits: '增值税免征、简化申报、赣欧班列', customs_code: '3601' },
+    { city: '合肥', province: '安徽', approved_year: '2016', main_categories: '家电、汽车配件、光伏产品', policy_benefits: '增值税免征、简化申报、合新欧班列', customs_code: '3401' },
     { city: '郑州', province: '河南', approved_year: '2016', main_categories: '服装、建材、农产品', policy_benefits: '增值税免征、简化申报、郑欧班列', customs_code: '4101' },
     { city: '武汉', province: '湖北', approved_year: '2016', main_categories: '光电子产品、汽车配件、纺织', policy_benefits: '增值税免征、简化申报、汉欧班列', customs_code: '4201' },
+    { city: '西安', province: '陕西', approved_year: '2016', main_categories: '农产品、工艺品、机械设备', policy_benefits: '增值税免征、简化申报、长安号班列', customs_code: '6101' },
+    { city: '兰州', province: '甘肃', approved_year: '2016', main_categories: '中药材、农产品、化工产品', policy_benefits: '增值税免征、简化申报、面向中亚', customs_code: '6201' },
+    { city: '乌鲁木齐', province: '新疆', approved_year: '2016', main_categories: '纺织品、农产品、建材', policy_benefits: '增值税免征、简化申报、面向中亚西亚', customs_code: '6501' },
+    { city: '沈阳', province: '辽宁', approved_year: '2016', main_categories: '机械设备、汽车配件、农产品', policy_benefits: '增值税免征、简化申报、面向东北亚', customs_code: '2101' },
+    { city: '大连', province: '辽宁', approved_year: '2016', main_categories: '水产品、服装、石化产品', policy_benefits: '增值税免征、简化申报、港口优势', customs_code: '2102' },
+    { city: '哈尔滨', province: '黑龙江', approved_year: '2016', main_categories: '农产品、木材、机电产品', policy_benefits: '增值税免征、简化申报、面向俄罗斯', customs_code: '2301' },
+    { city: '长春', province: '吉林', approved_year: '2016', main_categories: '农产品、汽车配件、医药', policy_benefits: '增值税免征、简化申报、面向东北亚', customs_code: '2201' },
+    { city: '石家庄', province: '河北', approved_year: '2016', main_categories: '纺织品、建材、医药', policy_benefits: '增值税免征、简化申报、冀欧班列', customs_code: '1301' },
+    { city: '唐山', province: '河北', approved_year: '2016', main_categories: '陶瓷、钢材、建材', policy_benefits: '增值税免征、简化申报、港口优势', customs_code: '1302' },
+    { city: '济南', province: '山东', approved_year: '2016', main_categories: '机械设备、纺织品、农产品', policy_benefits: '增值税免征、简化申报、济欧班列', customs_code: '3701' },
+    { city: '青岛', province: '山东', approved_year: '2016', main_categories: '家电、纺织品、水产品', policy_benefits: '增值税免征、简化申报、港口优势', customs_code: '3702' },
+    { city: '临沂', province: '山东', approved_year: '2016', main_categories: '板材、五金、劳保用品', policy_benefits: '增值税免征、简化申报、商贸物流城', customs_code: '3713' },
   ],
 });
 

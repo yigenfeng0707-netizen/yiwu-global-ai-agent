@@ -128,6 +128,7 @@ export default function CustomerService() {
           <MessageCircle size={16} className="text-yiwu-400" />
           <div className="relative">
             <select value={category} onChange={(e) => setCategory(e.target.value)}
+              aria-label="选择品类"
               className="appearance-none rounded-lg bg-ocean-800 px-3 py-1.5 pr-8 text-xs text-white border border-white/10 focus:border-yiwu-500 focus:outline-none">
               {categories.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -135,6 +136,7 @@ export default function CustomerService() {
           </div>
           <div className="relative">
             <select value={language} onChange={(e) => setLanguage(e.target.value)}
+              aria-label="选择客服语言"
               className="appearance-none rounded-lg bg-ocean-800 px-3 py-1.5 pr-8 text-xs text-white border border-white/10 focus:border-yiwu-500 focus:outline-none">
               {langOptions.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
             </select>

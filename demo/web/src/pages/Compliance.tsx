@@ -87,6 +87,7 @@ export default function Compliance() {
         <div className="flex flex-wrap gap-4 items-end">
           <div className="relative">
             <select value={category} onChange={(e) => setCategory(e.target.value)}
+              aria-label="选择品类"
               className="appearance-none rounded-lg bg-ocean-800 px-4 py-2 pr-10 text-sm text-white border border-white/10 focus:border-yiwu-500 focus:outline-none">
               {categories.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -94,6 +95,7 @@ export default function Compliance() {
           </div>
           <div className="relative">
             <select value={country} onChange={(e) => setCountry(e.target.value)}
+              aria-label="选择目标国家"
               className="appearance-none rounded-lg bg-ocean-800 px-4 py-2 pr-10 text-sm text-white border border-white/10 focus:border-yiwu-500 focus:outline-none">
               {countries.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>

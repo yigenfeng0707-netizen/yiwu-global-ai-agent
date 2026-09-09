@@ -88,7 +88,10 @@ htmlcov/
 .coverage
 
 .tmp_*.json
-demo/data/app.db
+# demo 运行时 SQLite 库及其 WAL/共享内存临时文件（测试/启动预热产生，不入库）
+demo/data/*.db
+demo/data/*.db-wal
+demo/data/*.db-shm
 
 # ========================
 # 演示视频（P3-4 重录前的 WIP 产物，避免 git 膨胀）

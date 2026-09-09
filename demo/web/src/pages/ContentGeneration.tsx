@@ -79,6 +79,7 @@ export default function ContentGeneration() {
         <div className="flex flex-wrap gap-4">
           <div className="relative">
             <select value={category} onChange={(e) => setCategory(e.target.value)}
+              aria-label="选择品类"
               className="appearance-none rounded-lg bg-ocean-800 px-4 py-2 pr-10 text-sm text-white border border-white/10 focus:border-yiwu-500 focus:outline-none">
               {categories.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -86,6 +87,7 @@ export default function ContentGeneration() {
           </div>
           <div className="relative">
             <select value={platform} onChange={(e) => setPlatform(e.target.value)}
+              aria-label="选择发布平台"
               className="appearance-none rounded-lg bg-ocean-800 px-4 py-2 pr-10 text-sm text-white border border-white/10 focus:border-yiwu-500 focus:outline-none">
               {platforms.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
@@ -93,6 +95,7 @@ export default function ContentGeneration() {
           </div>
           <div className="relative">
             <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)}
+              aria-label="选择目标语言"
               className="appearance-none rounded-lg bg-ocean-800 px-4 py-2 pr-10 text-sm text-white border border-white/10 focus:border-yiwu-500 focus:outline-none">
               {languages.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
             </select>

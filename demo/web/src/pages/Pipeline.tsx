@@ -391,6 +391,7 @@ export default function Pipeline() {
               <label className="text-xs text-gray-500 mb-1 block">{field.label}</label>
               <div className="relative">
                 <select value={field.value} onChange={(e) => field.setter(e.target.value)}
+                  aria-label={field.label}
                   className="appearance-none rounded-lg bg-ocean-800 px-3 py-2 pr-8 text-sm text-white border border-white/10 focus:border-yiwu-500 focus:outline-none">
                   {field.options.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>

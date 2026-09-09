@@ -2,6 +2,7 @@
 
 import os
 import logging
+import logging.config
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -13,6 +14,40 @@ from .middleware.auth import AuthMiddleware
 from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.signature import SignatureMiddleware
 from .middleware.api_usage import ApiUsageMiddleware
+
+
+def _configure_logging() -> None:
+    """P2-5 结构化日志配置：统一格式与级别，便于生产可观测性。
+
+    - 级别由环境变量 LOG_LEVEL 控制（默认 INFO）；
+    - disable_existing_loggers=False，保留 uvicorn/fastapi 自带日志；
+    - 配置失败降级为 basicConfig，绝不阻断应用启动。
+    """
+    level = os.getenv("LOG_LEVEL", "INFO").upper()
+    try:
+        logging.config.dictConfig({
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "standard": {
+                    "format": "%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+                    "datefmt": "%Y-%m-%d %H:%M:%S",
+                },
+            },
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "standard",
+                    "level": level,
+                },
+            },
+            "root": {"handlers": ["console"], "level": level},
+        })
+    except Exception:  # noqa: BLE001 - 日志配置失败不得阻断启动
+        logging.basicConfig(level=level, format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s")
+
+
+_configure_logging()
 
 logger = logging.getLogger(__name__)
 

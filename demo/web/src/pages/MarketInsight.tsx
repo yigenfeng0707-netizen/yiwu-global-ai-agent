@@ -75,6 +75,7 @@ export default function MarketInsight() {
           <select
             value={category}
             onChange={(e) => setSelectedCategory(e.target.value)}
+            aria-label="选择品类"
             className="appearance-none rounded-lg bg-ocean-800 px-4 py-2 pr-10 text-sm text-white border border-white/10 focus:border-yiwu-500 focus:outline-none"
           >
             {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
@@ -85,6 +86,7 @@ export default function MarketInsight() {
           <select
             value={targetMarket}
             onChange={(e) => setTargetMarket(e.target.value)}
+            aria-label="选择目标市场"
             className="appearance-none rounded-lg bg-ocean-800 px-4 py-2 pr-10 text-sm text-white border border-white/10 focus:border-yiwu-500 focus:outline-none"
           >
             {regions.map((r) => (<option key={r} value={r}>{r}</option>))}

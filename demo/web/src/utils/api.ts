@@ -240,7 +240,7 @@ export async function fetchComplianceCheck(category: string, target_country: str
 export async function calculateTariff(req: { category: string; target_country: string; product_value: number }) {
   return withSource(
     apiFetch('/tariff/calculate', { method: 'POST', body: JSON.stringify(req) }),
-    () => mockTariff(req.product_value),
+    () => mockTariff(req.product_value, req.target_country),
   );
 }
 
@@ -380,9 +380,14 @@ export interface SystemStatus {
   agents: Record<string, string>;
   agent_engines: Record<string, string>;
   llm_configured: boolean;   // AI 增强是否真正生效（后端已配置 LLM_API_KEY）
-  data_mode: string;         // 诚实标注：static-demo = 静态演示数据
+  data_mode: string;         // 诚实标注：hybrid(Nreal)=已接入N个真实源 / static-demo=全演示
   ai_enhanced_count: number; // 真正接入 LLM 的 Agent 数
   data_sources: number;
+  real_source_count?: number; // P1-1：真实接入的外部数据源数量
+  real_data_sources?: {       // P1-1：逐源真实状态（可自证）
+    source: string; is_real: boolean; age_seconds: number | null;
+    is_fresh: boolean; source_url: string; fetched_at_iso: string; error: string;
+  }[];
 }
 
 /**

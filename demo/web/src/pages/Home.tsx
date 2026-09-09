@@ -235,7 +235,19 @@ export default function Home() {
         >
           {categoryData.map((cat) => (
             <motion.div key={cat.name} variants={item}>
-              <div onClick={() => handleCategoryClick(cat.name)}>
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label={`查看${cat.name}品类的市场洞察`}
+                onClick={() => handleCategoryClick(cat.name)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleCategoryClick(cat.name);
+                  }
+                }}
+                className="cursor-pointer rounded-lg focus:outline-none focus:ring-2 focus:ring-yiwu-500"
+              >
                 <CategoryCard
                   icon={cat.icon}
                   name={cat.name}
