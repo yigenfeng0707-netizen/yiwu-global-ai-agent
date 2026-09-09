@@ -201,8 +201,11 @@ jobs:
             sleep 15
           done
           [ "$HEALTH" = "200" ] || { echo "::error::健康检查失败"; exit 1; }
+          # P2-4 起 GET 参数有枚举校验：category 必须在 CATEGORY_LIST、region 必须在
+          # SUPPORTED_REGIONS，否则返 400（响应无 ai_insight → 冒烟误判 LLM 未生效）。
+          # 玩具=%E7%8E%A9%E5%85%B7  东南亚=%E4%B8%9C%E5%8D%97%E4%BA%9A
           curl -s --max-time 60 -A "$UA" \
-            "$SERVICE_URL/api/v1/market-insight?category=%E5%9C%A3%E8%AF%9E%E9%A5%B0%E5%93%81&region=europe" \
+            "$SERVICE_URL/api/v1/market-insight?category=%E7%8E%A9%E5%85%B7&region=%E4%B8%9C%E5%8D%97%E4%BA%9A" \
             -o /tmp/mi.json
           HAS_INSIGHT=$(jq -r 'has("ai_insight")' /tmp/mi.json 2>/dev/null || echo false)
           echo "ai_insight present: $HAS_INSIGHT"
