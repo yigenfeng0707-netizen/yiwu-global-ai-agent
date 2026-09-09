@@ -13,7 +13,11 @@ logger = logging.getLogger(__name__)
 
 
 def _daily_count_path() -> Path:
-    """日计数状态文件：与数据库同目录（生产环境随 DATABASE_PATH 落持久卷，重启不清零）"""
+    """[已弃用·仅迁移读] 旧 JSON 日计数文件路径。
+
+    P3-2 起日计数已迁 SQLite（llm_daily_count 表），本路径仅用于首次启动时
+    做一次性迁移读（读完即删），以及兼容旧测试对 _count_file 的断言。
+    """
     db_path = os.getenv("DATABASE_PATH", "")
     base = Path(db_path).parent if db_path else Path(__file__).resolve().parent.parent.parent / "data"
     return base / "llm_daily_count.json"
@@ -47,7 +51,13 @@ def _parse_fallback() -> Dict[str, Any]:
 
 
 class LLMService:
-    """LLM服务 - 阿里云百炼DashScope API（OpenAI兼容模式）"""
+    """LLM服务 - 阿里云百炼DashScope API（OpenAI兼容模式）
+
+    P3-2 持久化升级：日计数从 JSON 文件迁 SQLite（llm_daily_count 表），
+    与用户/会话/API 用量等其余持久化状态统一走 DATABASE_PATH（魔搭容器
+    /mnt/workspace/data/app.db 持久卷，重启不丢）。首次启动时从旧 JSON
+    做一次性迁移读，读完即删避免双写漂移。
+    """
 
     def __init__(self):
         self.base_url = os.getenv(
@@ -65,21 +75,51 @@ class LLMService:
         self._fallback_cooldown_until = 0.0
         self._daily_count = 0
         self._daily_reset = time.time()
+        # P3-2：保留 _count_file 属性仅用于一次性迁移读 + 旧测试兼容
         self._count_file = _daily_count_path()
         self._restore_daily_count()
 
+    def _get_db(self):
+        """延迟导入 db，避免循环依赖（llm.py ← database.py 无引用，安全）。"""
+        from ..db.database import get_db
+        return get_db()
+
     def _restore_daily_count(self):
-        """从磁盘恢复当日计数（容器重启不清零）"""
+        """从 SQLite 恢复当日计数；首次启动时从旧 JSON 做一次性迁移。"""
+        today = date.today().isoformat()
+        # 1) 优先读 SQLite（P3-2 起权威源）
         try:
-            state = json.loads(self._count_file.read_text(encoding="utf-8"))
-            if state.get("date") == date.today().isoformat():
-                self._daily_count = int(state.get("count", 0))
-                if self._daily_count:
-                    logger.info("恢复当日LLM计数: %d", self._daily_count)
+            db = self._get_db()
+            count = db.get_llm_daily_count(today)
+            if count > 0:
+                self._daily_count = count
+                logger.info("恢复当日LLM计数(SQLite): %d", count)
+                return
+        except Exception as e:
+            logger.warning("读 SQLite LLM 日计数失败，回退 JSON 迁移: %s", e)
+
+        # 2) SQLite 无记录 → 尝试从旧 JSON 文件做一次性迁移
+        try:
+            if self._count_file.exists():
+                state = json.loads(self._count_file.read_text(encoding="utf-8"))
+                if state.get("date") == today:
+                    migrated = int(state.get("count", 0))
+                    if migrated > 0:
+                        self._daily_count = migrated
+                        try:
+                            self._get_db().set_llm_daily_count(today, migrated)
+                            logger.info("从 JSON 迁移当日LLM计数到 SQLite: %d", migrated)
+                        except Exception as e:
+                            logger.warning("迁移 JSON→SQLite 失败: %s", e)
+                # 迁移完成（或日期不匹配）→ 删旧文件避免双写漂移
+                try:
+                    self._count_file.unlink()
+                except Exception:
+                    pass
         except FileNotFoundError:
             pass
         except Exception as e:
-            logger.warning("读取LLM日计数失败: %s", e)
+            logger.warning("读取旧 JSON LLM 日计数失败: %s", e)
 
     def _get_headers(self, api_key: str = None) -> dict:
         """构建请求头，含DashScope工作空间"""
@@ -102,16 +142,14 @@ class LLMService:
         return True
 
     def _increment_count(self):
-        """增加调用计数并落盘"""
-        self._daily_count += 1
+        """增加调用计数并原子落 SQLite（P3-2：替代旧 JSON 文件写）。"""
+        today = date.today().isoformat()
         try:
-            self._count_file.parent.mkdir(parents=True, exist_ok=True)
-            self._count_file.write_text(
-                json.dumps({"date": date.today().isoformat(), "count": self._daily_count}),
-                encoding="utf-8",
-            )
+            self._daily_count = self._get_db().incr_llm_daily_count(today)
         except Exception as e:
-            logger.warning("写入LLM日计数失败: %s", e)
+            # SQLite 写失败不阻断 LLM 调用，仅本地计数 +1 并告警
+            logger.warning("写入 LLM 日计数到 SQLite 失败: %s", e)
+            self._daily_count += 1
 
     @property
     def daily_usage(self) -> Dict[str, int]:

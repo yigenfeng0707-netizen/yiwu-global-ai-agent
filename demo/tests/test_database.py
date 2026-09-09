@@ -97,3 +97,83 @@ class TestQueryHistory:
         history = db.get_query_history(user_email="user@test.com")
         assert len(history) == 1
         assert history[0]["agent_name"] == "agent1"
+
+
+# ==================== P3-2：连接池 thread-local 复用 ====================
+
+class TestConnectionPooling:
+    """P3-2：_get_conn 用 thread-local 缓存连接，避免每操作新建。"""
+
+    def test_same_thread_reuses_connection(self, db):
+        """同线程内多次 _get_conn 返回同一 Connection 对象（复用，非新建）。"""
+        c1 = db._get_conn()
+        c2 = db._get_conn()
+        c3 = db._get_conn()
+        assert c1 is c2 is c3
+
+    def test_cross_thread_isolation(self, db):
+        """不同线程拿到不同 Connection（sqlite3 非线程安全，必须隔离）。"""
+        import threading
+        main_conn = db._get_conn()
+        other_conn_holder = {}
+
+        def worker():
+            other_conn_holder["conn"] = db._get_conn()
+
+        t = threading.Thread(target=worker)
+        t.start()
+        t.join(timeout=5)
+        assert "conn" in other_conn_holder
+        assert other_conn_holder["conn"] is not main_conn
+
+    def test_close_all_releases_connection(self, db):
+        """close_all 后下次 _get_conn 应新建（旧连接已释放）。"""
+        c1 = db._get_conn()
+        db.close_all()
+        c2 = db._get_conn()
+        assert c1 is not c2
+
+    def test_operations_still_work_after_close_all(self, db):
+        """close_all 后后续操作应自动重连，功能不受影响（WAL 持久化）。"""
+        db.create_user("pool@test.com", "hash", "PoolCo")
+        db.close_all()
+        user = db.get_user_by_email("pool@test.com")
+        assert user is not None
+        assert user["company"] == "PoolCo"
+
+
+# ==================== P3-2：LLM 日计数 SQLite 承载 ====================
+
+class TestLLMDailyCount:
+    """P3-2：llm_daily_count 表 get/set/incr 原子性与按日期隔离。"""
+
+    def test_get_missing_date_returns_zero(self, db):
+        assert db.get_llm_daily_count("1999-01-01") == 0
+
+    def test_set_then_get(self, db):
+        db.set_llm_daily_count("2026-09-09", 42)
+        assert db.get_llm_daily_count("2026-09-09") == 42
+
+    def test_set_overwrites(self, db):
+        db.set_llm_daily_count("2026-09-09", 10)
+        db.set_llm_daily_count("2026-09-09", 25)
+        assert db.get_llm_daily_count("2026-09-09") == 25
+
+    def test_incr_from_zero(self, db):
+        assert db.incr_llm_daily_count("2026-09-10") == 1
+        assert db.incr_llm_daily_count("2026-09-10") == 2
+        assert db.incr_llm_daily_count("2026-09-10") == 3
+        assert db.get_llm_daily_count("2026-09-10") == 3
+
+    def test_incr_after_set(self, db):
+        db.set_llm_daily_count("2026-09-11", 100)
+        assert db.incr_llm_daily_count("2026-09-11") == 101
+
+    def test_dates_isolated(self, db):
+        """不同日期计数互不干扰。"""
+        db.set_llm_daily_count("2026-09-09", 5)
+        db.set_llm_daily_count("2026-09-10", 7)
+        assert db.get_llm_daily_count("2026-09-09") == 5
+        assert db.get_llm_daily_count("2026-09-10") == 7
+        assert db.incr_llm_daily_count("2026-09-09") == 6
+        assert db.get_llm_daily_count("2026-09-10") == 7  # 未受影响

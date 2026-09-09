@@ -2,6 +2,7 @@
 
 import os
 import sqlite3
+import threading
 import time
 import json
 import hashlib
@@ -13,18 +14,48 @@ DB_PATH = os.getenv("DATABASE_PATH", str(Path(__file__).resolve().parent.parent.
 
 
 class Database:
-    """SQLite数据库 - 用户管理、会话存储、API用量追踪、查询历史"""
+    """SQLite数据库 - 用户管理、会话存储、API用量追踪、查询历史、LLM日计数
+
+    P3-2 持久化升级：
+      - 连接复用：thread-local 缓存 sqlite3.Connection，避免每操作新建（原 _get_conn
+        每次 sqlite3.connect + PRAGMA journal_mode=WAL，高频调用下开销显著）。
+      - WAL 模式仅在连接首次创建时设置一次。
+      - 新增 llm_daily_count 表，把 LLM 日计数从 JSON 文件迁到 SQLite，与其余
+        持久化状态统一走一条路径（魔搭容器 /mnt/workspace 持久卷重启不丢）。
+      - close_all() 供测试 / 优雅关机时释放当前线程连接。
+    """
 
     def __init__(self, db_path: str = DB_PATH):
         self.db_path = db_path
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        self._local = threading.local()
         self._init_db()
 
     def _get_conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
+        """取当前线程缓存的连接；首次调用时建立并设 WAL。
+
+        sqlite3.Connection 非线程安全，故用 thread-local 隔离；同线程内复用
+        避免反复 open/close 的文件系统开销。FastAPI 默认单 worker + asyncio
+        事件循环下，绝大多数调用落在主线程，复用收益最大。
+        """
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")  # WAL 下 NORMAL 已足够安全，写入更快
+            self._local.conn = conn
         return conn
+
+    def close_all(self) -> None:
+        """关闭当前线程缓存的连接（测试隔离 / 优雅关机用）。"""
+        conn = getattr(self._local, "conn", None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            self._local.conn = None
 
     def _init_db(self):
         """初始化数据库表"""
@@ -87,6 +118,12 @@ class Database:
                     fetched_at REAL DEFAULT 0,
                     source_url TEXT DEFAULT '',
                     error TEXT DEFAULT '',
+                    updated_at REAL NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS llm_daily_count (
+                    date TEXT PRIMARY KEY,
+                    count INTEGER NOT NULL DEFAULT 0,
                     updated_at REAL NOT NULL
                 );
 
@@ -297,6 +334,52 @@ class Database:
                     record["payload"] = {}
                 out.append(record)
             return out
+
+    # ==================== LLM 日计数（P3-2：从 JSON 文件迁 SQLite） ====================
+
+    def get_llm_daily_count(self, date_iso: str) -> int:
+        """取指定日期的 LLM 调用计数；无记录返 0。"""
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT count FROM llm_daily_count WHERE date = ?", (date_iso,)
+            ).fetchone()
+            return int(row["count"]) if row else 0
+
+    def set_llm_daily_count(self, date_iso: str, count: int) -> None:
+        """UPSERT 指定日期的 LLM 调用计数（原子写，魔搭容器重启不丢）。"""
+        with self._get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO llm_daily_count (date, count, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(date) DO UPDATE SET
+                    count      = excluded.count,
+                    updated_at = excluded.updated_at
+                """,
+                (date_iso, int(count), time.time()),
+            )
+
+    def incr_llm_daily_count(self, date_iso: str) -> int:
+        """原子自增指定日期的 LLM 调用计数，返回自增后的值。
+
+        用 UPSERT + returning 语义（SQLite 3.35+ 支持 RETURNING；为兼容旧版
+        采用先 UPSERT 再 SELECT 的两步法，仍在同一事务内保证原子）。
+        """
+        with self._get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO llm_daily_count (date, count, updated_at)
+                VALUES (?, 1, ?)
+                ON CONFLICT(date) DO UPDATE SET
+                    count      = count + 1,
+                    updated_at = excluded.updated_at
+                """,
+                (date_iso, time.time()),
+            )
+            row = conn.execute(
+                "SELECT count FROM llm_daily_count WHERE date = ?", (date_iso,)
+            ).fetchone()
+            return int(row["count"]) if row else 0
 
 
 # 全局数据库实例（懒加载）

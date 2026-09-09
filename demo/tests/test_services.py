@@ -167,25 +167,62 @@ class TestLLMService:
         assert called == []
 
     def test_daily_count_persistence(self, monkeypatch, tmp_path):
-        """日计数落盘并在重启后恢复（同一天）"""
+        """P3-2：日计数落 SQLite 并在重启后恢复（同一天）"""
+        # 重置全局单例，让 get_db() 指向 tmp_path（否则模块加载时已用原 DB_PATH 初始化）
+        import app.db.database as db_mod
+        monkeypatch.setattr(db_mod, "_db_instance", None)
         monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "app.db"))
+        # 预初始化单例指向 tmp_path
+        from app.db.database import Database, get_db
+        monkeypatch.setattr(db_mod, "_db_instance", Database(str(tmp_path / "app.db")))
+
         service = LLMService()
         service._increment_count()
         service._increment_count()
         assert service._daily_count == 2
 
-        # 模拟重启：新实例同一天恢复计数
+        # 验证已落 SQLite（权威源），不再写 JSON
+        db = get_db()
+        from datetime import date
+        assert db.get_llm_daily_count(date.today().isoformat()) == 2
+        # 旧 JSON 文件不应存在（P3-2 起已弃用）
+        assert not (tmp_path / "llm_daily_count.json").exists()
+
+        # 模拟重启：新实例同一天从 SQLite 恢复计数
         service2 = LLMService()
         assert service2._daily_count == 2
 
-        # 跨天则不恢复
-        import json
-        state_file = service2._count_file
-        state = json.loads(state_file.read_text(encoding="utf-8"))
-        state["date"] = "2000-01-01"
-        state_file.write_text(json.dumps(state), encoding="utf-8")
+        # 跨天则不恢复（SQLite 按 date 主键隔离）
+        db.set_llm_daily_count("2000-01-01", 99)
         service3 = LLMService()
-        assert service3._daily_count == 0
+        # 今天仍是 2（不会读到 2000-01-01 的 99）
+        assert service3._daily_count == 2
+
+    def test_daily_count_json_migration(self, monkeypatch, tmp_path):
+        """P3-2：首次启动从旧 JSON 文件一次性迁移到 SQLite，读完即删"""
+        import json
+        from datetime import date
+        # 重置全局单例指向 tmp_path
+        import app.db.database as db_mod
+        monkeypatch.setattr(db_mod, "_db_instance", None)
+        monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "app.db"))
+        from app.db.database import Database, get_db
+        monkeypatch.setattr(db_mod, "_db_instance", Database(str(tmp_path / "app.db")))
+
+        # 预置旧 JSON 文件（模拟 P3-2 之前的状态）
+        legacy = tmp_path / "llm_daily_count.json"
+        legacy.write_text(
+            json.dumps({"date": date.today().isoformat(), "count": 7}),
+            encoding="utf-8",
+        )
+        service = LLMService()
+        # 迁移后内存计数 = 7
+        assert service._daily_count == 7
+        # SQLite 已承载
+        db = get_db()
+        assert db.get_llm_daily_count(date.today().isoformat()) == 7
+        # 旧 JSON 已删（避免双写漂移）
+        assert not legacy.exists()
 
 
 # ==================== Pydantic模型 ====================
