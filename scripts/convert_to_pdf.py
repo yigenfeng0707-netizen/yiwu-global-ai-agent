@@ -23,6 +23,7 @@ DOC_LIST = [
     "答辩QA手册",
     "视频脚本",
     "部署指南",
+    "OnePager_EN",
 ]
 
 def main():
