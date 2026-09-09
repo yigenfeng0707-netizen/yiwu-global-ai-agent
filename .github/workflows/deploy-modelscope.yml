@@ -204,12 +204,19 @@ jobs:
           # P2-4 起 GET 参数有枚举校验：category 必须在 CATEGORY_LIST、region 必须在
           # SUPPORTED_REGIONS，否则返 400（响应无 ai_insight → 冒烟误判 LLM 未生效）。
           # 玩具=%E7%8E%A9%E5%85%B7  东南亚=%E4%B8%9C%E5%8D%97%E4%BA%9A
-          curl -s --max-time 60 -A "$UA" \
-            "$SERVICE_URL/api/v1/market-insight?category=%E7%8E%A9%E5%85%B7&region=%E4%B8%9C%E5%8D%97%E4%BA%9A" \
-            -o /tmp/mi.json
-          HAS_INSIGHT=$(jq -r 'has("ai_insight")' /tmp/mi.json 2>/dev/null || echo false)
-          echo "ai_insight present: $HAS_INSIGHT"
-          if [ "$HAS_INSIGHT" = "false" ]; then
+          # AI 生效性验证带重试：容器冷启动时 LLM 网关首调可能 >60s（热态实测 ~9s），
+          # 单次 curl 会瞬态误杀部署；3 次 × 45s + 间隔 20s 对齐 health check 重试模式。
+          HAS_INSIGHT=false
+          for attempt in 1 2 3; do
+            curl -s --max-time 45 -A "$UA" \
+              "$SERVICE_URL/api/v1/market-insight?category=%E7%8E%A9%E5%85%B7&region=%E4%B8%9C%E5%8D%97%E4%BA%9A" \
+              -o /tmp/mi.json || true
+            HAS_INSIGHT=$(jq -r 'has("ai_insight")' /tmp/mi.json 2>/dev/null || echo false)
+            echo "attempt $attempt: ai_insight present=$HAS_INSIGHT"
+            [ "$HAS_INSIGHT" = "true" ] && break
+            [ "$attempt" -lt 3 ] && { echo "等待 LLM 网关预热..."; sleep 20; }
+          done
+          if [ "$HAS_INSIGHT" != "true" ]; then
             echo "::warning::ai_insight 缺失，LLM 未生效（检查平台 Secrets 与网关余额）"
             exit 1
           fi
