@@ -71,7 +71,8 @@ def make_cache_key(*args, **kwargs) -> str:
     parts = [str(a) for a in args]
     parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()))
     raw = "|".join(parts)
-    return hashlib.md5(raw.encode()).hexdigest()
+    # MD5 仅用于缓存键去重（非密码学安全用途），碰撞不影响正确性
+    return hashlib.md5(raw.encode()).hexdigest()  # nosec B324
 
 
 # 全局缓存实例

@@ -37,9 +37,25 @@ jobs:
           # 风格检查(行长等)显式非阻塞，仅报告不失败
           flake8 app/ --count --max-line-length=120 --statistics --exit-zero
 
-      - name: Run Python unit tests
+      - name: Security scan with bandit
         run: |
-          python -m pytest tests/ --tb=short -q -v
+          pip install bandit
+          # P2-1：仅阻断 Medium+High（-ll）；Low 级别噪音大不入门禁
+          # cache.py md5 已加 # nosec B324（缓存键非安全用途，误报抑制）
+          bandit -r app/ -ll
+
+      - name: Dependency audit with pip-audit
+        run: |
+          pip install pip-audit
+          # P2-1：扫描 requirements.txt 已知漏洞（--strict 使无法解析的依赖也报错）
+          pip-audit -r requirements.txt --strict
+
+      - name: Run Python unit tests with coverage gate
+        run: |
+          pip install pytest-cov
+          # P2-1：覆盖率门禁 ≥80%（当前实测 82%，留缓冲防回退）
+          python -m pytest tests/ --tb=short -q -v \
+            --cov=app --cov-report=term-missing --cov-fail-under=80
 
   frontend-check:
     name: Frontend Check
@@ -66,6 +82,9 @@ jobs:
 
       - name: Lint
         run: npx eslint . --max-warnings=0
+
+      - name: Unit tests (vitest)
+        run: npm run test
 
       - name: Build verification
         run: npm run build

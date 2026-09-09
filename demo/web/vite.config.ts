@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tsconfigPaths from "vite-tsconfig-paths";
@@ -28,4 +29,12 @@ export default defineConfig({
     react(),
     tsconfigPaths()
   ],
+  // P2-1：vitest 配置（复用上方 plugins 保 @/ 路径别名生效）
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    css: false,
+  },
 })

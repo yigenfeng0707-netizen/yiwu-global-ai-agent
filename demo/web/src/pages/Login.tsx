@@ -236,6 +236,8 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPwd(!showPwd)}
+                  aria-label={showPwd ? '隐藏密码' : '显示密码'}
+                  title={showPwd ? '隐藏密码' : '显示密码'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
                 >
                   {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -295,6 +297,8 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPwd(!showPwd)}
+                  aria-label={showPwd ? '隐藏密码' : '显示密码'}
+                  title={showPwd ? '隐藏密码' : '显示密码'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
                 >
                   {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
