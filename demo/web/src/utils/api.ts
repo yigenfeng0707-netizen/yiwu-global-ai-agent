@@ -7,6 +7,7 @@ import {
   mockPolicyBenefit, mockPolicyCases,
 } from './mockData';
 import { withSource } from '@/store/useDataSource';
+import { TOKEN_STORAGE_KEY } from '@/store/useStore';
 
 // ==================== 类型定义 ====================
 
@@ -174,11 +175,20 @@ async function apiFetch<T>(url: string, options?: RequestInit & { timeout?: numb
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    // P3-1：注入 JWT（登录后 localStorage 有则带，未登录/登出后不带）
+    let token: string | null = null;
+    try { token = localStorage.getItem(TOKEN_STORAGE_KEY); } catch { /* SSR/隐私模式下降级 */ }
+    const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
     const res = await fetch(`${BASE_URL}${url}`, {
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers: { 'Content-Type': 'application/json', ...authHeaders, ...options?.headers },
       ...options,
       signal: controller.signal,
     });
+    // P3-1：401 表示 token 过期/无效，主动清除避免下次继续带坏 token
+    if (res.status === 401 && token) {
+      try { localStorage.removeItem(TOKEN_STORAGE_KEY); } catch { /* ignore */ }
+    }
     if (!res.ok) {
       throw new Error(`API Error: ${res.status}`);
     }

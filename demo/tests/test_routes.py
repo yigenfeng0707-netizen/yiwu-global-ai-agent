@@ -226,3 +226,52 @@ class TestMonitorRoutes:
         resp = await client.get("/api/v1/stats/history")
         assert resp.status_code == 200
         assert "history" in resp.json()
+
+
+# ==================== P2-4：GET 参数枚举校验 ====================
+
+class TestEnumValidation:
+    """P2-4：GET 参数取值域校验，未知值直接 400 并列出合法值，
+    避免落到 Agent 内部才崩、也让 OpenAPI 明示取值域。"""
+
+    @pytest.mark.asyncio
+    async def test_market_insight_invalid_category(self, client):
+        resp = await client.get("/api/v1/market-insight?category=不存在的品类&region=东南亚")
+        assert resp.status_code == 400
+        detail = resp.json()["detail"]
+        assert "category" in detail
+        assert "不存在的品类" in detail  # 回显用户传的值，便于前端定位
+
+    @pytest.mark.asyncio
+    async def test_market_insight_invalid_region(self, client):
+        resp = await client.get("/api/v1/market-insight?category=玩具&region=火星")
+        assert resp.status_code == 400
+        assert "region" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_smart_selection_invalid_budget(self, client):
+        resp = await client.get("/api/v1/smart-selection?category=玩具&budget=超多&region=东南亚")
+        assert resp.status_code == 400
+        assert "budget" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_faq_invalid_language(self, client):
+        resp = await client.get("/api/v1/customer-service/faq?category=玩具&language=fr")
+        assert resp.status_code == 400
+        assert "language" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_supply_chain_invalid_path_category(self, client):
+        resp = await client.get("/api/v1/supply-chain/不存在品类")
+        assert resp.status_code == 400
+        assert "category" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_valid_params_still_200(self, client):
+        """正向路径：合法枚举值仍返 200，未被新校验误伤。"""
+        resp = await client.get("/api/v1/market-insight?category=玩具&region=东南亚")
+        assert resp.status_code == 200
+        resp = await client.get("/api/v1/smart-selection?category=日用百货&budget=中&region=欧洲（义新欧班列直达）")
+        assert resp.status_code == 200
+        resp = await client.get("/api/v1/customer-service/faq?category=玩具&language=zh")
+        assert resp.status_code == 200

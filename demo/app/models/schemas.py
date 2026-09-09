@@ -113,3 +113,101 @@ class PolicyBenefitCalcRequest(BaseModel):
 class LocalizedCaseRequest(BaseModel):
     case_id: int = 1
     target_city: str = ""
+
+
+# ==================== 响应模型（P2-4：稳定端点契约化，Agent 动态响应除外） ====================
+
+
+class ApiRootResponse(BaseModel):
+    service: str
+    version: str
+    description: str
+
+
+class AgentInfoItem(BaseModel):
+    name: str
+    display_name: str
+    status: str
+    description: str
+    engine: str
+
+
+class AgentsInfoResponse(BaseModel):
+    agents: List[AgentInfoItem]
+    ai_enhanced_count: int
+
+
+class CategoriesResponse(BaseModel):
+    categories: List[str]
+
+
+class RegionsResponse(BaseModel):
+    regions: List[str]
+
+
+class DataSourcesResponse(BaseModel):
+    sources: List[Dict[str, Any]]
+    real_count: int
+    total: int
+    note: str
+
+
+class RealDataSourceStatus(BaseModel):
+    """/status 中逐源真实数据状态（可自证：带 source_url 与数据年龄）。"""
+    source: str
+    is_real: bool
+    age_seconds: Optional[float] = None
+    is_fresh: Optional[bool] = None
+    source_url: str = ""
+    fetched_at_iso: str = ""
+    error: str = ""
+
+
+class SystemStatusResponse(BaseModel):
+    service: str
+    version: str
+    agents: Dict[str, str]
+    llm_configured: bool
+    data_mode: str
+    real_data_sources: List[RealDataSourceStatus]
+    real_source_count: int
+    agent_engines: Dict[str, str]
+    ai_enhanced_count: int
+    llm_usage: Dict[str, Any]
+    data_sources: int
+    cache: Dict[str, Any]
+
+
+class AuthLoginResponse(BaseModel):
+    success: bool
+    token: str
+    email: str
+    user_id: str
+    company: str = ""
+
+
+class AuthRegisterResponse(BaseModel):
+    success: bool
+    user_id: Optional[str] = None
+    email: Optional[str] = None
+    detail: Optional[str] = None
+
+
+class UsageStatsResponse(BaseModel):
+    api_usage: Dict[str, Any]
+    auth: Dict[str, Any]
+    chat_sessions: int
+    cache: Dict[str, Any]
+
+
+class QueryHistoryResponse(BaseModel):
+    history: List[Dict[str, Any]]
+
+
+class ChatHistoryResponse(BaseModel):
+    session_id: str
+    messages: List[Dict[str, Any]]
+
+
+class PolicyCasesResponse(BaseModel):
+    cases: List[Dict[str, Any]]

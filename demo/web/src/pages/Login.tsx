@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Building, Eye, EyeOff, Train, Globe, ShieldCheck } from 'lucide-react';
-import { useStore } from '@/store/useStore';
+import { useStore, TOKEN_STORAGE_KEY } from '@/store/useStore';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
@@ -51,7 +51,7 @@ export default function Login() {
       });
       const data = await res.json();
       if (data.token) {
-        localStorage.setItem('yiwu_token', data.token);
+        localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
         login({
           id: 'user_' + Date.now(),
           email: data.email || email,

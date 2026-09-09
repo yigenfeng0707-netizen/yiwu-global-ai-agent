@@ -2,7 +2,7 @@
 
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from ..agents.market_insight import MarketInsightAgent
@@ -20,12 +20,32 @@ from ..models.schemas import (
     ContentGenerateRequest, CustomerChatRequest, TariffCalcRequest,
     LoginRequest, RegisterRequest, PipelineRequest, SupplyChainRequest, LogisticsRequest,
     PolicyBenefitCalcRequest, LocalizedCaseRequest,
+    # 响应模型（P2-4：稳定端点契约化）
+    ApiRootResponse, AgentsInfoResponse, CategoriesResponse, RegionsResponse,
+    DataSourcesResponse, SystemStatusResponse,
+    AuthLoginResponse, AuthRegisterResponse,
+    UsageStatsResponse, QueryHistoryResponse, ChatHistoryResponse, PolicyCasesResponse,
 )
 from ..services.auth import auth_service
 from ..services.llm import llm_service
 from ..cache import cache, cached
 
 router = APIRouter()
+
+
+# P2-4：GET 参数枚举校验（未知值直接 400，避免落到 Agent 内部才崩，也让 OpenAPI 明示取值域）
+_BUDGET_VALUES = ("低", "中", "高")
+_LANGUAGE_VALUES = ("zh", "en")
+
+
+def _validate_enum(value: str, allowed, field_name: str) -> str:
+    """校验 GET 参数取值是否在允许集合内，不在则抛 400 并列出合法值。"""
+    if value not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"参数 {field_name}='{value}' 不合法，允许值：{list(allowed)}",
+        )
+    return value
 
 # Agent 引擎类型（P1-2 后 7 个 Agent 均接入 LLM 增强：确定性/规则骨架 + LLM 推理）
 # 用于 /status 与 /agents/info 对外如实反映 AI 接入程度，避免"7个AI数字员工"叙事与实现不符
@@ -53,7 +73,7 @@ data_manager = DataSourceManager()
 
 # ==================== 基础接口 ====================
 
-@router.get("/")
+@router.get("/", response_model=ApiRootResponse)
 async def api_root():
     """API根路径"""
     return {
@@ -63,7 +83,7 @@ async def api_root():
     }
 
 
-@router.get("/agents/info")
+@router.get("/agents/info", response_model=AgentsInfoResponse)
 async def get_agents_info():
     """获取智能体信息"""
     agents = [
@@ -83,21 +103,21 @@ async def get_agents_info():
     }
 
 
-@router.get("/categories")
+@router.get("/categories", response_model=CategoriesResponse)
 @cached(ttl=3600)
 async def get_categories():
     """获取品类列表（静态常量，缓存1小时）"""
     return {"categories": CATEGORY_LIST}
 
 
-@router.get("/regions")
+@router.get("/regions", response_model=RegionsResponse)
 @cached(ttl=3600)
 async def get_regions():
     """获取目标市场区域（静态常量，缓存1小时）"""
     return {"regions": SUPPORTED_REGIONS}
 
 
-@router.get("/data-sources")
+@router.get("/data-sources", response_model=DataSourcesResponse)
 async def get_data_sources():
     """获取数据源三态清单（real 真实接入 / demo 演示 / planned 规划中，含新鲜度溯源）"""
     sources = data_manager.list_all_sources()
@@ -169,8 +189,13 @@ async def get_yiwu_trade_city():
 # ==================== 市场洞察 ====================
 
 @router.get("/market-insight")
-async def get_market_insight(category: str = CATEGORY_LIST[0], region: str = SUPPORTED_REGIONS[0]):
+async def get_market_insight(
+    category: str = Query(CATEGORY_LIST[0], description="品类，取值见 /categories"),
+    region: str = Query(SUPPORTED_REGIONS[0], description="目标市场区域，取值见 /regions"),
+):
     """市场洞察"""
+    _validate_enum(category, CATEGORY_LIST, "category")
+    _validate_enum(region, SUPPORTED_REGIONS, "region")
     result = await market_agent.execute(category=category, region=region)
     return result
 
@@ -178,8 +203,15 @@ async def get_market_insight(category: str = CATEGORY_LIST[0], region: str = SUP
 # ==================== 智能选品 ====================
 
 @router.get("/smart-selection")
-async def get_smart_selection(category: str = CATEGORY_LIST[0], budget: str = "中", region: str = SUPPORTED_REGIONS[0]):
+async def get_smart_selection(
+    category: str = Query(CATEGORY_LIST[0], description="品类，取值见 /categories"),
+    budget: str = Query("中", description="预算档位：低/中/高"),
+    region: str = Query(SUPPORTED_REGIONS[0], description="目标市场区域，取值见 /regions"),
+):
     """智能选品"""
+    _validate_enum(category, CATEGORY_LIST, "category")
+    _validate_enum(budget, _BUDGET_VALUES, "budget")
+    _validate_enum(region, SUPPORTED_REGIONS, "region")
     result = await selection_agent.execute(category=category, budget=budget, region=region)
     return result
 
@@ -187,8 +219,16 @@ async def get_smart_selection(category: str = CATEGORY_LIST[0], budget: str = "�
 # ==================== 供应链匹配 ====================
 
 @router.get("/supply-chain/{category}")
-async def get_supply_chain(category: str, region: str = "", budget: str = "中"):
+async def get_supply_chain(
+    category: str,
+    region: str = Query("", description="目标市场区域，空=不限"),
+    budget: str = Query("中", description="预算档位：低/中/高"),
+):
     """供应链匹配"""
+    _validate_enum(category, CATEGORY_LIST, "category")
+    _validate_enum(budget, _BUDGET_VALUES, "budget")
+    if region:
+        _validate_enum(region, SUPPORTED_REGIONS, "region")
     result = await supply_chain_agent.execute(category=category, region=region, budget=budget)
     return result
 
@@ -228,8 +268,12 @@ async def generate_content(req: ContentGenerateRequest):
 # ==================== 合规查询 ====================
 
 @router.get("/compliance")
-async def get_compliance(category: str = CATEGORY_LIST[0], target_country: str = "德国"):
+async def get_compliance(
+    category: str = Query(CATEGORY_LIST[0], description="品类，取值见 /categories"),
+    target_country: str = Query("德国", description="目标国家"),
+):
     """合规查询"""
+    _validate_enum(category, CATEGORY_LIST, "category")
     result = await compliance_agent.execute(category=category, target_country=target_country)
     return result
 
@@ -260,8 +304,13 @@ async def customer_chat(req: CustomerChatRequest):
 
 
 @router.get("/customer-service/faq")
-async def get_faq(category: str = CATEGORY_LIST[0], language: str = "zh"):
+async def get_faq(
+    category: str = Query(CATEGORY_LIST[0], description="品类，取值见 /categories"),
+    language: str = Query("zh", description="语言：zh/en"),
+):
     """获取FAQ"""
+    _validate_enum(category, CATEGORY_LIST, "category")
+    _validate_enum(language, _LANGUAGE_VALUES, "language")
     result = await customer_agent.get_faq(category=category, language=language)
     return result
 
@@ -300,7 +349,7 @@ async def calculate_policy_benefit(req: PolicyBenefitCalcRequest):
     return result
 
 
-@router.get("/policy-replication/cases")
+@router.get("/policy-replication/cases", response_model=PolicyCasesResponse)
 async def get_policy_cases():
     """义乌成功案例"""
     from ..data.policy_data import YIWU_SUCCESS_CASES
@@ -360,14 +409,14 @@ async def run_pipeline_stream(req: PipelineRequest):
 
 # ==================== 认证接口 ====================
 
-@router.post("/auth/register")
+@router.post("/auth/register", response_model=AuthRegisterResponse)
 async def register(req: RegisterRequest):
     """注册"""
     result = auth_service.register(email=req.email, password=req.password, company=req.company or "")
     return result
 
 
-@router.post("/auth/login")
+@router.post("/auth/login", response_model=AuthLoginResponse)
 async def login(req: LoginRequest):
     """登录"""
     result = auth_service.login(email=req.email, password=req.password)
@@ -378,7 +427,7 @@ async def login(req: LoginRequest):
 
 # ==================== 系统状态 ====================
 
-@router.get("/status")
+@router.get("/status", response_model=SystemStatusResponse)
 async def get_status():
     """系统状态（可自证的真实健康态）"""
     reg = get_registry()
@@ -427,7 +476,7 @@ async def get_status():
 
 # ==================== 系统监控 ====================
 
-@router.get("/stats/usage")
+@router.get("/stats/usage", response_model=UsageStatsResponse)
 async def get_usage_stats():
     """API使用统计"""
     from ..db.database import get_db
@@ -440,7 +489,7 @@ async def get_usage_stats():
     }
 
 
-@router.get("/stats/history")
+@router.get("/stats/history", response_model=QueryHistoryResponse)
 async def get_query_history(limit: int = 20):
     """查询历史"""
     from ..db.database import get_db
@@ -448,7 +497,7 @@ async def get_query_history(limit: int = 20):
     return {"history": db.get_query_history(limit=limit)}
 
 
-@router.get("/chat/history/{session_id}")
+@router.get("/chat/history/{session_id}", response_model=ChatHistoryResponse)
 async def get_chat_history(session_id: str, limit: int = 50):
     """获取聊天会话历史"""
     from ..db.database import get_db

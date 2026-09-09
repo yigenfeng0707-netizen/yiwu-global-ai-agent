@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 
+/** P3-1：JWT token 在 localStorage 的键名（与 Login.tsx / api.ts 保持一致）。 */
+export const TOKEN_STORAGE_KEY = 'yiwu_token';
+
 export const categories = [
   '日用百货',
   '饰品配件',
@@ -48,6 +51,10 @@ export const useStore = create<StoreState>((set) => ({
   setBudget: (budget) => set({ budget }),
   setTargetMarket: (market) => set({ targetMarket: market }),
   login: (user) => set({ isAuthenticated: true, user }),
-  logout: () => set({ isAuthenticated: false, user: null }),
+  logout: () => {
+    // P3-1：登出同时清除持久化 token，避免 apiFetch 继续注入过期 Authorization 头
+    try { localStorage.removeItem(TOKEN_STORAGE_KEY); } catch { /* SSR/隐私模式下降级 */ }
+    set({ isAuthenticated: false, user: null });
+  },
   setSelectedPolicyCity: (city) => set({ selectedPolicyCity: city }),
 }));
