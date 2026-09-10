@@ -154,6 +154,7 @@ class DataSourcesResponse(BaseModel):
 
 class RealDataSourceStatus(BaseModel):
     """/status 中逐源真实数据状态（可自证：带 source_url 与数据年龄）。"""
+
     source: str
     is_real: bool
     age_seconds: Optional[float] = None
@@ -211,3 +212,93 @@ class ChatHistoryResponse(BaseModel):
 
 class PolicyCasesResponse(BaseModel):
     cases: List[Dict[str, Any]]
+
+
+# ==================== P3-5 商业化：定价/支付/转化模型 ====================
+
+
+class PricingPlanItem(BaseModel):
+    code: str
+    name: str
+    price_cny: float
+    price_display: str
+    period: str
+    description: str
+    features: List[str]
+    highlight: bool
+    cta: str
+    duration_days: int
+
+
+class PricingPlansResponse(BaseModel):
+    plans: List[Dict[str, Any]]
+    variant: str
+    variant_label: str
+    layout: str
+    experiment: str
+
+
+class TrackEventRequest(BaseModel):
+    event_type: str
+    plan_code: str = ""
+    session_id: str = ""
+    metadata: Dict[str, Any] = {}
+
+
+class TrackEventResponse(BaseModel):
+    success: bool
+    event_id: int
+
+
+class CheckoutRequest(BaseModel):
+    plan_code: str
+    pay_method: str = "alipay_sandbox"
+
+
+class CheckoutResponse(BaseModel):
+    success: bool
+    order_no: Optional[str] = None
+    amount_cny: Optional[float] = None
+    plan_name: Optional[str] = None
+    plan_code: Optional[str] = None
+    status: Optional[str] = None
+    provider: Optional[str] = None
+    pay_method: Optional[str] = None
+    pay_url: Optional[str] = None
+    expires_in_seconds: Optional[int] = None
+    note: Optional[str] = None
+    detail: Optional[str] = None
+
+
+class PaymentConfirmRequest(BaseModel):
+    order_no: str
+    pay_method: str = "alipay_sandbox"
+
+
+class PaymentConfirmResponse(BaseModel):
+    success: bool
+    order_no: Optional[str] = None
+    status: Optional[str] = None
+    plan_code: Optional[str] = None
+    plan_name: Optional[str] = None
+    subscription_id: Optional[int] = None
+    expires_at: Optional[float] = None
+    detail: Optional[str] = None
+    already_paid: Optional[bool] = None
+
+
+class OrdersResponse(BaseModel):
+    orders: List[Dict[str, Any]]
+
+
+class SubscriptionResponse(BaseModel):
+    subscription: Optional[Dict[str, Any]] = None
+
+
+class FunnelSummaryResponse(BaseModel):
+    events: Dict[str, int]
+    conversion_rate: float
+    checkout_rate: float
+    payment_rate: float
+    total_events: int
+    hours: int

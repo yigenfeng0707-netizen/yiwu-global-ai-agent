@@ -1,14 +1,18 @@
 """义乌小商品出海智能体 - 内容生成Agent"""
 
-import random
 from typing import Any, Dict, List, Optional
 
 from .base import BaseAgent
 from ..data.market_data import CATEGORY_LIST
 from ..data.content_data import (
-    SUPPORTED_LANGUAGES, SUPPORTED_PLATFORMS, SEO_KEYWORDS,
-    HIGHLIGHT_TEMPLATES, SOCIAL_COPY_TEMPLATES, DESCRIPTION_TEMPLATES,
-    TITLE_TEMPLATES, AD_COPY_TEMPLATES,
+    SUPPORTED_LANGUAGES,
+    SUPPORTED_PLATFORMS,
+    SEO_KEYWORDS,
+    HIGHLIGHT_TEMPLATES,
+    SOCIAL_COPY_TEMPLATES,
+    DESCRIPTION_TEMPLATES,
+    TITLE_TEMPLATES,
+    AD_COPY_TEMPLATES,
 )
 
 
@@ -25,16 +29,106 @@ class ContentGenerationAgent(BaseAgent):
 
     # 品类翻译映射
     CATEGORY_TRANSLATIONS = {
-        "日用百货": {"en": "Daily Necessities", "de": "Haushaltswaren", "fr": "Articles Ménagers", "es": "Artículos Diarios", "ar": "مستلزمات يومية", "ru": "Товары повседневного спроса", "kk": "Күнделікті тауарлар", "ja": "日用品"},
-        "饰品配件": {"en": "Jewelry & Accessories", "de": "Schmuck & Zubehör", "fr": "Bijoux & Accessoires", "es": "Joyería y Accesorios", "ar": "مجوهرات وإكسسوارات", "ru": "Украшения и аксессуары", "kk": "Әшекей бұйымдар", "ja": "アクセサリー"},
-        "玩具": {"en": "Toys", "de": "Spielzeug", "fr": "Jouets", "es": "Juguetes", "ar": "ألعاب", "ru": "Игрушки", "kk": "Ойыншықтар", "ja": "玩具"},
-        "文具办公用品": {"en": "Stationery & Office Supplies", "de": "Schreibwaren & Bürobedarf", "fr": "Papeterie & Fournitures", "es": "Papelería y Oficina", "ar": "قرطاسية ومستلزمات مكتبية", "ru": "Канцелярские товары", "kk": "Канцелярия", "ja": "文房具・オフィス用品"},
-        "针织品": {"en": "Knitwear", "de": "Strickwaren", "fr": "Tricot", "es": "Punto", "ar": "منتجات تريكو", "ru": "Трикотаж", "kk": "Трикотаж", "ja": "ニット用品"},
-        "工艺品": {"en": "Crafts & Decor", "de": "Handwerk & Deko", "fr": "Artisanat & Déco", "es": "Artesanía y Decoración", "ar": "حرف يدوية وديكور", "ru": "Ремесла и декор", "kk": "Қолөнер және декор", "ja": "工芸品"},
-        "电子电器": {"en": "Electronics & Electrical", "de": "Elektronik & Elektro", "fr": "Électronique & Électrique", "es": "Electrónica y Eléctrica", "ar": "إلكترونيات وكهربائيات", "ru": "Электроника и электрика", "kk": "Электроника және электр", "ja": "電子電器"},
-        "五金工具": {"en": "Hardware & Tools", "de": "Werkzeug & Eisenwaren", "fr": "Quincaillerie & Outils", "es": "Ferretería y Herramientas", "ar": "أدوات ومعدات", "ru": "Инструменты и фурнитура", "kk": "Құралдар және жабдықтар", "ja": "金物・工具"},
-        "服装服饰": {"en": "Clothing & Apparel", "de": "Kleidung & Bekleidung", "fr": "Vêtements & Mode", "es": "Ropa y Moda", "ar": "ملابس وأزياء", "ru": "Одежда", "kk": "Киім", "ja": "アパレル"},
-        "家居装饰": {"en": "Home Decor", "de": "Heimdekoration", "fr": "Décoration Maison", "es": "Decoración del Hogar", "ar": "ديكور منزلي", "ru": "Домашний декор", "kk": "Үй декоры", "ja": "ホームデコ"},
+        "日用百货": {
+            "en": "Daily Necessities",
+            "de": "Haushaltswaren",
+            "fr": "Articles Ménagers",
+            "es": "Artículos Diarios",
+            "ar": "مستلزمات يومية",
+            "ru": "Товары повседневного спроса",
+            "kk": "Күнделікті тауарлар",
+            "ja": "日用品",
+        },
+        "饰品配件": {
+            "en": "Jewelry & Accessories",
+            "de": "Schmuck & Zubehör",
+            "fr": "Bijoux & Accessoires",
+            "es": "Joyería y Accesorios",
+            "ar": "مجوهرات وإكسسوارات",
+            "ru": "Украшения и аксессуары",
+            "kk": "Әшекей бұйымдар",
+            "ja": "アクセサリー",
+        },
+        "玩具": {
+            "en": "Toys",
+            "de": "Spielzeug",
+            "fr": "Jouets",
+            "es": "Juguetes",
+            "ar": "ألعاب",
+            "ru": "Игрушки",
+            "kk": "Ойыншықтар",
+            "ja": "玩具",
+        },
+        "文具办公用品": {
+            "en": "Stationery & Office Supplies",
+            "de": "Schreibwaren & Bürobedarf",
+            "fr": "Papeterie & Fournitures",
+            "es": "Papelería y Oficina",
+            "ar": "قرطاسية ومستلزمات مكتبية",
+            "ru": "Канцелярские товары",
+            "kk": "Канцелярия",
+            "ja": "文房具・オフィス用品",
+        },
+        "针织品": {
+            "en": "Knitwear",
+            "de": "Strickwaren",
+            "fr": "Tricot",
+            "es": "Punto",
+            "ar": "منتجات تريكو",
+            "ru": "Трикотаж",
+            "kk": "Трикотаж",
+            "ja": "ニット用品",
+        },
+        "工艺品": {
+            "en": "Crafts & Decor",
+            "de": "Handwerk & Deko",
+            "fr": "Artisanat & Déco",
+            "es": "Artesanía y Decoración",
+            "ar": "حرف يدوية وديكور",
+            "ru": "Ремесла и декор",
+            "kk": "Қолөнер және декор",
+            "ja": "工芸品",
+        },
+        "电子电器": {
+            "en": "Electronics & Electrical",
+            "de": "Elektronik & Elektro",
+            "fr": "Électronique & Électrique",
+            "es": "Electrónica y Eléctrica",
+            "ar": "إلكترونيات وكهربائيات",
+            "ru": "Электроника и электрика",
+            "kk": "Электроника және электр",
+            "ja": "電子電器",
+        },
+        "五金工具": {
+            "en": "Hardware & Tools",
+            "de": "Werkzeug & Eisenwaren",
+            "fr": "Quincaillerie & Outils",
+            "es": "Ferretería y Herramientas",
+            "ar": "أدوات ومعدات",
+            "ru": "Инструменты и фурнитура",
+            "kk": "Құралдар және жабдықтар",
+            "ja": "金物・工具",
+        },
+        "服装服饰": {
+            "en": "Clothing & Apparel",
+            "de": "Kleidung & Bekleidung",
+            "fr": "Vêtements & Mode",
+            "es": "Ropa y Moda",
+            "ar": "ملابس وأزياء",
+            "ru": "Одежда",
+            "kk": "Киім",
+            "ja": "アパレル",
+        },
+        "家居装饰": {
+            "en": "Home Decor",
+            "de": "Heimdekoration",
+            "fr": "Décoration Maison",
+            "es": "Decoración del Hogar",
+            "ar": "ديكور منزلي",
+            "ru": "Домашний декор",
+            "kk": "Үй декоры",
+            "ja": "ホームデコ",
+        },
     }
 
     async def execute(self, **kwargs) -> Dict[str, Any]:
@@ -45,7 +139,9 @@ class ContentGenerationAgent(BaseAgent):
 
         # 生成内容
         title = self._generate_title(product_name, category, platform, target_language)
-        description = self._generate_description(product_name, category, target_language)
+        description = self._generate_description(
+            product_name, category, target_language
+        )
         highlights = self._generate_highlights(category)
         seo_keywords = self._generate_seo_keywords(category, target_language)
         social_copy = self._generate_social_copy(category, target_language)
@@ -54,40 +150,49 @@ class ContentGenerationAgent(BaseAgent):
         # 平台合规提示
         warnings = self._get_platform_warnings(category, platform)
 
-        result = self._wrap_response({
-            "product_name": product_name,
-            "category": category,
-            "platform": platform,
-            "target_language": target_language,
-            "content": {
-                "title": title,
-                "description": description,
-                "highlights": highlights,
-                "seo_keywords": seo_keywords,
-            },
-            "marketing": {
-                "social_copy": social_copy,
-                "ad_copy": ad_copy,
-            },
-            "platform_compliance": {
-                "warnings": warnings,
-            },
-        })
+        result = self._wrap_response(
+            {
+                "product_name": product_name,
+                "category": category,
+                "platform": platform,
+                "target_language": target_language,
+                "content": {
+                    "title": title,
+                    "description": description,
+                    "highlights": highlights,
+                    "seo_keywords": seo_keywords,
+                },
+                "marketing": {
+                    "social_copy": social_copy,
+                    "ad_copy": ad_copy,
+                },
+                "platform_compliance": {
+                    "warnings": warnings,
+                },
+            }
+        )
 
         # LLM增强：生成AI优化版标题和描述
         if product_name:
             llm_result = await self._llm_enhance_content(
-                product_name, category, platform, target_language,
+                product_name,
+                category,
+                platform,
+                target_language,
             )
             if llm_result:
                 result["ai_enhanced"] = llm_result
 
         # 记录查询
-        self.record_query({"product_name": product_name, "category": category, "platform": platform})
+        self.record_query(
+            {"product_name": product_name, "category": category, "platform": platform}
+        )
 
         return result
 
-    def _generate_title(self, product_name: str, category: str, platform: str, lang: str) -> str:
+    def _generate_title(
+        self, product_name: str, category: str, platform: str, lang: str
+    ) -> str:
         """生成产品标题"""
         template = TITLE_TEMPLATES.get(category, "")
         translated_category = self._translate_category(category, lang)
@@ -126,7 +231,14 @@ class ContentGenerationAgent(BaseAgent):
 
     def _generate_ad_copy(self, category: str, lang: str) -> Dict[str, str]:
         """生成广告文案"""
-        return AD_COPY_TEMPLATES.get(category, {"headline": "Yiwu Direct", "body": "From Yiwu to the World", "cta_button": "Shop Now"})
+        return AD_COPY_TEMPLATES.get(
+            category,
+            {
+                "headline": "Yiwu Direct",
+                "body": "From Yiwu to the World",
+                "cta_button": "Shop Now",
+            },
+        )
 
     def _get_platform_warnings(self, category: str, platform: str) -> List[str]:
         """获取平台合规提示"""
@@ -152,22 +264,25 @@ class ContentGenerationAgent(BaseAgent):
         # 简单映射，实际应调用LLM翻译
         return name
 
-    async def _llm_enhance_content(self, product_name: str, category: str,
-                                    platform: str, lang: str) -> Optional[Dict[str, str]]:
+    async def _llm_enhance_content(
+        self, product_name: str, category: str, platform: str, lang: str
+    ) -> Optional[Dict[str, str]]:
         """LLM增强内容生成 - 生成AI优化版标题和描述"""
         from ..services.llm import llm_service
+
         if not llm_service.api_key:
             return None
 
         prompt = (
             f"为以下跨境电商产品生成优化内容：\n"
             f"产品：{product_name}\n品类：{category}\n平台：{platform}\n目标语言：{lang}\n\n"
-            f"请返回JSON格式：{{\"optimized_title\": \"优化标题\", \"optimized_description\": \"优化描述(100字内)\", \"hashtags\": \"标签1 #标签2\"}}"
+            f'请返回JSON格式：{{"optimized_title": "优化标题", "optimized_description": "优化描述(100字内)", "hashtags": "标签1 #标签2"}}'
         )
         result = await self.llm_generate(prompt, temperature=0.7, max_tokens=500)
         if result:
             try:
                 import json
+
                 # 尝试解析JSON
                 cleaned = result.strip()
                 if cleaned.startswith("```"):

@@ -3,6 +3,13 @@
 # ========================
 __pycache__/
 *.py[cod]
+
+# DuMate workspace
+.dumate/
+
+# CI temp reports
+bandit_report.json
+pip_audit_report.json
 *$py.class
 *.so
 *.egg

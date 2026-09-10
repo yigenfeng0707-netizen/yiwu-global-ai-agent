@@ -411,3 +411,129 @@ export async function fetchSystemStatus(): Promise<SystemStatus | null> {
     return null;
   }
 }
+
+// ==================== P3-5 商业化：定价/支付/转化 ====================
+
+export interface PricingPlan {
+  code: string;
+  name: string;
+  price_cny: number;
+  price_display: string;
+  period: string;
+  description: string;
+  features: string[];
+  highlight: boolean;
+  cta: string;
+  duration_days: number;
+}
+
+export interface PricingPlansResponse {
+  plans: PricingPlan[];
+  variant: string;
+  variant_label: string;
+  layout: string;
+  experiment: string;
+}
+
+export interface CheckoutResult {
+  success: boolean;
+  order_no: string;
+  amount_cny: number;
+  plan_name: string;
+  plan_code: string;
+  status: string;
+  provider: string;
+  pay_method: string;
+  pay_url: string;
+  expires_in_seconds: number;
+  note: string;
+}
+
+export interface PaymentConfirmResult {
+  success: boolean;
+  order_no: string;
+  status: string;
+  plan_code: string;
+  plan_name: string;
+  subscription_id: number;
+  expires_at: number;
+}
+
+export interface OrderRecord {
+  id: number;
+  order_no: string;
+  user_email: string;
+  plan_code: string;
+  amount_cny: number;
+  status: string;
+  provider: string;
+  pay_method: string;
+  created_at: number;
+  paid_at: number | null;
+}
+
+export interface SubscriptionRecord {
+  id: number;
+  user_email: string;
+  plan_code: string;
+  status: string;
+  started_at: number;
+  expires_at: number;
+  payment_order_id: string;
+}
+
+export interface FunnelSummary {
+  events: Record<string, number>;
+  conversion_rate: number;
+  checkout_rate: number;
+  payment_rate: number;
+  total_events: number;
+  hours: number;
+}
+
+/** 获取套餐列表 + A/B 变体（无需登录） */
+export async function fetchPricingPlans(sessionId: string = ''): Promise<PricingPlansResponse> {
+  const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
+  return apiFetch<PricingPlansResponse>(`/pricing/plans${qs}`);
+}
+
+/** 记录转化事件（无需登录，匿名也可埋点） */
+export async function trackConversionEvent(
+  eventType: string, planCode: string = '', sessionId: string = '', metadata: Record<string, unknown> = {},
+): Promise<{ success: boolean; event_id: number }> {
+  return apiFetch<{ success: boolean; event_id: number }>('/pricing/track', {
+    method: 'POST',
+    body: JSON.stringify({ event_type: eventType, plan_code: planCode, session_id: sessionId, metadata }),
+  });
+}
+
+/** 创建沙箱支付订单（需登录） */
+export async function createCheckout(planCode: string, payMethod: string = 'alipay_sandbox'): Promise<CheckoutResult> {
+  return apiFetch<CheckoutResult>('/pricing/checkout', {
+    method: 'POST',
+    body: JSON.stringify({ plan_code: planCode, pay_method: payMethod }),
+  });
+}
+
+/** 确认沙箱支付（需登录） */
+export async function confirmPayment(orderNo: string, payMethod: string = 'alipay_sandbox'): Promise<PaymentConfirmResult> {
+  return apiFetch<PaymentConfirmResult>('/pricing/payment-callback', {
+    method: 'POST',
+    body: JSON.stringify({ order_no: orderNo, pay_method: payMethod }),
+  });
+}
+
+/** 获取当前用户订单列表（需登录） */
+export async function fetchOrders(): Promise<{ orders: OrderRecord[] }> {
+  return apiFetch<{ orders: OrderRecord[] }>('/pricing/orders');
+}
+
+/** 获取当前用户有效订阅（需登录） */
+export async function fetchSubscription(): Promise<{ subscription: SubscriptionRecord | null }> {
+  return apiFetch<{ subscription: SubscriptionRecord | null }>('/pricing/subscription');
+}
+
+/** 获取转化漏斗汇总（供评审展示真实数据驱动能力） */
+export async function fetchFunnelSummary(hours: number = 24): Promise<FunnelSummary> {
+  return apiFetch<FunnelSummary>(`/pricing/funnel?hours=${hours}`);
+}

@@ -2,7 +2,7 @@
 
 import json
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from ..agents.market_insight import MarketInsightAgent
@@ -13,21 +13,54 @@ from ..agents.customer_service_agent import CustomerServiceAgent
 from ..agents.supply_chain_agent import SupplyChainAgent
 from ..agents.policy_replication_agent import PolicyReplicationAgent
 from ..agents.workflow import CrossBorderWorkflow, WorkflowState
-from ..data.market_data import CATEGORY_LIST, SUPPORTED_REGIONS, YIWU_INDEX, YIXINOU_DATA, YIWU_TRADE_CITY
+from ..data.market_data import (
+    CATEGORY_LIST,
+    SUPPORTED_REGIONS,
+    YIWU_INDEX,
+    YIXINOU_DATA,
+    YIWU_TRADE_CITY,
+)
 from ..data.sources import DataSourceManager
 from ..data.etl import get_registry
 from ..models.schemas import (
-    ContentGenerateRequest, CustomerChatRequest, TariffCalcRequest,
-    LoginRequest, RegisterRequest, PipelineRequest, SupplyChainRequest, LogisticsRequest,
-    PolicyBenefitCalcRequest, LocalizedCaseRequest,
+    ContentGenerateRequest,
+    CustomerChatRequest,
+    TariffCalcRequest,
+    LoginRequest,
+    RegisterRequest,
+    PipelineRequest,
+    SupplyChainRequest,
+    LogisticsRequest,
+    PolicyBenefitCalcRequest,
+    LocalizedCaseRequest,
     # 响应模型（P2-4：稳定端点契约化）
-    ApiRootResponse, AgentsInfoResponse, CategoriesResponse, RegionsResponse,
-    DataSourcesResponse, SystemStatusResponse,
-    AuthLoginResponse, AuthRegisterResponse,
-    UsageStatsResponse, QueryHistoryResponse, ChatHistoryResponse, PolicyCasesResponse,
+    ApiRootResponse,
+    AgentsInfoResponse,
+    CategoriesResponse,
+    RegionsResponse,
+    DataSourcesResponse,
+    SystemStatusResponse,
+    AuthLoginResponse,
+    AuthRegisterResponse,
+    UsageStatsResponse,
+    QueryHistoryResponse,
+    ChatHistoryResponse,
+    PolicyCasesResponse,
+    # P3-5 商业化模型
+    PricingPlansResponse,
+    TrackEventRequest,
+    TrackEventResponse,
+    CheckoutRequest,
+    CheckoutResponse,
+    PaymentConfirmRequest,
+    PaymentConfirmResponse,
+    OrdersResponse,
+    SubscriptionResponse,
+    FunnelSummaryResponse,
 )
 from ..services.auth import auth_service
 from ..services.llm import llm_service
+from ..services.billing import billing_service
 from ..cache import cache, cached
 
 router = APIRouter()
@@ -46,6 +79,7 @@ def _validate_enum(value: str, allowed, field_name: str) -> str:
             detail=f"参数 {field_name}='{value}' 不合法，允许值：{list(allowed)}",
         )
     return value
+
 
 # Agent 引擎类型（P1-2 后 7 个 Agent 均接入 LLM 增强：确定性/规则骨架 + LLM 推理）
 # 用于 /status 与 /agents/info 对外如实反映 AI 接入程度，避免"7个AI数字员工"叙事与实现不符
@@ -73,6 +107,7 @@ data_manager = DataSourceManager()
 
 # ==================== 基础接口 ====================
 
+
 @router.get("/", response_model=ApiRootResponse)
 async def api_root():
     """API根路径"""
@@ -87,13 +122,48 @@ async def api_root():
 async def get_agents_info():
     """获取智能体信息"""
     agents = [
-        {"name": "market_insight", "display_name": "市场洞察", "status": "online", "description": "分析全球市场趋势与义乌指数"},
-        {"name": "smart_selection", "display_name": "智能选品", "status": "online", "description": "基于多维度数据智能推荐选品"},
-        {"name": "content_generation", "display_name": "内容生成", "status": "online", "description": "生成多语言跨境电商内容"},
-        {"name": "compliance", "display_name": "合规查询", "status": "online", "description": "查询目标市场合规要求与关税"},
-        {"name": "customer_service", "display_name": "智能客服", "status": "online", "description": "多语言智能客服与FAQ"},
-        {"name": "supply_chain", "display_name": "供应链匹配", "status": "online", "description": "供应链与物流智能匹配"},
-        {"name": "policy_replication", "display_name": "政策复制", "status": "online", "description": "1039政策解读、39城复制推广、红利计算"},
+        {
+            "name": "market_insight",
+            "display_name": "市场洞察",
+            "status": "online",
+            "description": "分析全球市场趋势与义乌指数",
+        },
+        {
+            "name": "smart_selection",
+            "display_name": "智能选品",
+            "status": "online",
+            "description": "基于多维度数据智能推荐选品",
+        },
+        {
+            "name": "content_generation",
+            "display_name": "内容生成",
+            "status": "online",
+            "description": "生成多语言跨境电商内容",
+        },
+        {
+            "name": "compliance",
+            "display_name": "合规查询",
+            "status": "online",
+            "description": "查询目标市场合规要求与关税",
+        },
+        {
+            "name": "customer_service",
+            "display_name": "智能客服",
+            "status": "online",
+            "description": "多语言智能客服与FAQ",
+        },
+        {
+            "name": "supply_chain",
+            "display_name": "供应链匹配",
+            "status": "online",
+            "description": "供应链与物流智能匹配",
+        },
+        {
+            "name": "policy_replication",
+            "display_name": "政策复制",
+            "status": "online",
+            "description": "1039政策解读、39城复制推广、红利计算",
+        },
     ]
     for a in agents:
         a["engine"] = AGENT_ENGINES.get(a["name"], "rule-based")
@@ -166,9 +236,13 @@ async def get_yiwu_index():
         },
         "official_published": {
             "is_real": bool(official_meta.get("is_real")),
-            "index_type": (official or {}).get("index_type", "义乌中国小商品指数（官方发布值）"),
+            "index_type": (official or {}).get(
+                "index_type", "义乌中国小商品指数（官方发布值）"
+            ),
             "index_scale": (official or {}).get("index_scale", "官方千点基准"),
-            "update_mode": (official or {}).get("update_mode", "定期更新（官方发布，非实时面板）"),
+            "update_mode": (official or {}).get(
+                "update_mode", "定期更新（官方发布，非实时面板）"
+            ),
             "records": (official or {}).get("records", []),
             "record_count": (official or {}).get("record_count", 0),
             "source_url": official_meta.get("source_url", ""),
@@ -188,10 +262,13 @@ async def get_yiwu_trade_city():
 
 # ==================== 市场洞察 ====================
 
+
 @router.get("/market-insight")
 async def get_market_insight(
     category: str = Query(CATEGORY_LIST[0], description="品类，取值见 /categories"),
-    region: str = Query(SUPPORTED_REGIONS[0], description="目标市场区域，取值见 /regions"),
+    region: str = Query(
+        SUPPORTED_REGIONS[0], description="目标市场区域，取值见 /regions"
+    ),
 ):
     """市场洞察"""
     _validate_enum(category, CATEGORY_LIST, "category")
@@ -202,21 +279,27 @@ async def get_market_insight(
 
 # ==================== 智能选品 ====================
 
+
 @router.get("/smart-selection")
 async def get_smart_selection(
     category: str = Query(CATEGORY_LIST[0], description="品类，取值见 /categories"),
     budget: str = Query("中", description="预算档位：低/中/高"),
-    region: str = Query(SUPPORTED_REGIONS[0], description="目标市场区域，取值见 /regions"),
+    region: str = Query(
+        SUPPORTED_REGIONS[0], description="目标市场区域，取值见 /regions"
+    ),
 ):
     """智能选品"""
     _validate_enum(category, CATEGORY_LIST, "category")
     _validate_enum(budget, _BUDGET_VALUES, "budget")
     _validate_enum(region, SUPPORTED_REGIONS, "region")
-    result = await selection_agent.execute(category=category, budget=budget, region=region)
+    result = await selection_agent.execute(
+        category=category, budget=budget, region=region
+    )
     return result
 
 
 # ==================== 供应链匹配 ====================
+
 
 @router.get("/supply-chain/{category}")
 async def get_supply_chain(
@@ -229,18 +312,23 @@ async def get_supply_chain(
     _validate_enum(budget, _BUDGET_VALUES, "budget")
     if region:
         _validate_enum(region, SUPPORTED_REGIONS, "region")
-    result = await supply_chain_agent.execute(category=category, region=region, budget=budget)
+    result = await supply_chain_agent.execute(
+        category=category, region=region, budget=budget
+    )
     return result
 
 
 @router.post("/supply-chain")
 async def post_supply_chain(req: SupplyChainRequest):
     """供应链匹配（POST）"""
-    result = await supply_chain_agent.execute(category=req.category, region=req.region, budget=req.budget)
+    result = await supply_chain_agent.execute(
+        category=req.category, region=req.region, budget=req.budget
+    )
     return result
 
 
 # ==================== 义新欧班列物流 ====================
+
 
 @router.get("/logistics/yixinou")
 async def get_yixinou_logistics(region: str = "", category: str = ""):
@@ -252,6 +340,7 @@ async def get_yixinou_logistics(region: str = "", category: str = ""):
 
 
 # ==================== 内容生成 ====================
+
 
 @router.post("/content/generate")
 async def generate_content(req: ContentGenerateRequest):
@@ -267,6 +356,7 @@ async def generate_content(req: ContentGenerateRequest):
 
 # ==================== 合规查询 ====================
 
+
 @router.get("/compliance")
 async def get_compliance(
     category: str = Query(CATEGORY_LIST[0], description="品类，取值见 /categories"),
@@ -274,7 +364,9 @@ async def get_compliance(
 ):
     """合规查询"""
     _validate_enum(category, CATEGORY_LIST, "category")
-    result = await compliance_agent.execute(category=category, target_country=target_country)
+    result = await compliance_agent.execute(
+        category=category, target_country=target_country
+    )
     return result
 
 
@@ -290,6 +382,7 @@ async def calculate_tariff(req: TariffCalcRequest):
 
 
 # ==================== 智能客服 ====================
+
 
 @router.post("/customer-service/chat")
 async def customer_chat(req: CustomerChatRequest):
@@ -316,6 +409,7 @@ async def get_faq(
 
 
 # ==================== 政策复制 ====================
+
 
 @router.get("/policy-replication/cities")
 async def get_policy_cities():
@@ -353,10 +447,12 @@ async def calculate_policy_benefit(req: PolicyBenefitCalcRequest):
 async def get_policy_cases():
     """义乌成功案例"""
     from ..data.policy_data import YIWU_SUCCESS_CASES
+
     return {"cases": YIWU_SUCCESS_CASES}
 
 
 # ==================== 全链路工作流 ====================
+
 
 @router.post("/pipeline")
 async def run_pipeline(req: PipelineRequest):
@@ -409,10 +505,13 @@ async def run_pipeline_stream(req: PipelineRequest):
 
 # ==================== 认证接口 ====================
 
+
 @router.post("/auth/register", response_model=AuthRegisterResponse)
 async def register(req: RegisterRequest):
     """注册"""
-    result = auth_service.register(email=req.email, password=req.password, company=req.company or "")
+    result = auth_service.register(
+        email=req.email, password=req.password, company=req.company or ""
+    )
     return result
 
 
@@ -421,11 +520,14 @@ async def login(req: LoginRequest):
     """登录"""
     result = auth_service.login(email=req.email, password=req.password)
     if not result.get("success"):
-        raise HTTPException(status_code=401, detail=result.get("detail", "邮箱或密码错误"))
+        raise HTTPException(
+            status_code=401, detail=result.get("detail", "邮箱或密码错误")
+        )
     return result
 
 
 # ==================== 系统状态 ====================
+
 
 @router.get("/status", response_model=SystemStatusResponse)
 async def get_status():
@@ -434,15 +536,17 @@ async def get_status():
     real_sources = []
     for name in reg.source_names:
         meta = reg.get_meta(name)
-        real_sources.append({
-            "source": name,
-            "is_real": bool(meta.get("is_real")),
-            "age_seconds": meta.get("age_seconds"),
-            "is_fresh": meta.get("is_fresh"),
-            "source_url": meta.get("source_url", ""),
-            "fetched_at_iso": meta.get("fetched_at_iso", ""),
-            "error": meta.get("error", ""),
-        })
+        real_sources.append(
+            {
+                "source": name,
+                "is_real": bool(meta.get("is_real")),
+                "age_seconds": meta.get("age_seconds"),
+                "is_fresh": meta.get("is_fresh"),
+                "source_url": meta.get("source_url", ""),
+                "fetched_at_iso": meta.get("fetched_at_iso", ""),
+                "error": meta.get("error", ""),
+            }
+        )
     real_count = sum(1 for s in real_sources if s["is_real"])
     # 诚实标注数据模式：有真实源接入为 hybrid，全不可用回退 static-demo
     data_mode = f"hybrid({real_count}real)" if real_count else "static-demo"
@@ -467,7 +571,9 @@ async def get_status():
         "real_source_count": real_count,
         # 各 Agent 引擎类型（llm-enhanced / rule-based）
         "agent_engines": AGENT_ENGINES,
-        "ai_enhanced_count": sum(1 for e in AGENT_ENGINES.values() if e == "llm-enhanced"),
+        "ai_enhanced_count": sum(
+            1 for e in AGENT_ENGINES.values() if e == "llm-enhanced"
+        ),
         "llm_usage": llm_service.daily_usage,
         "data_sources": len(data_manager.list_sources()),
         "cache": cache.stats,
@@ -476,10 +582,12 @@ async def get_status():
 
 # ==================== 系统监控 ====================
 
+
 @router.get("/stats/usage", response_model=UsageStatsResponse)
 async def get_usage_stats():
     """API使用统计"""
     from ..db.database import get_db
+
     db = get_db()
     return {
         "api_usage": db.get_api_usage_stats(hours=24),
@@ -493,6 +601,7 @@ async def get_usage_stats():
 async def get_query_history(limit: int = 20):
     """查询历史"""
     from ..db.database import get_db
+
     db = get_db()
     return {"history": db.get_query_history(limit=limit)}
 
@@ -501,5 +610,104 @@ async def get_query_history(limit: int = 20):
 async def get_chat_history(session_id: str, limit: int = 50):
     """获取聊天会话历史"""
     from ..db.database import get_db
+
     db = get_db()
-    return {"session_id": session_id, "messages": db.get_chat_history(session_id, limit=limit)}
+    return {
+        "session_id": session_id,
+        "messages": db.get_chat_history(session_id, limit=limit),
+    }
+
+
+# ==================== P3-5 商业化：定价/支付/转化 ====================
+
+
+def _get_user_email(request: Request) -> str:
+    """从 Authorization 头解析当前用户 email；无 token 或无效返回空串。"""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return ""
+    token = auth_header[7:]
+    payload = auth_service.verify(token)
+    return (payload or {}).get("email", "")
+
+
+@router.get("/pricing/plans", response_model=PricingPlansResponse)
+async def get_pricing_plans(request: Request, session_id: str = ""):
+    """获取套餐列表 + A/B 变体分配（无需登录，匿名访客也可分桶）。"""
+    user_email = _get_user_email(request)
+    return billing_service.get_plans_with_variant(user_email, session_id)
+
+
+@router.post("/pricing/track", response_model=TrackEventResponse)
+async def track_conversion_event(req: TrackEventRequest, request: Request):
+    """记录转化事件（page_view / plan_click / checkout_start / checkout_abandon）。
+
+    无需登录——匿名访客也埋点，用 session_id 关联。
+    """
+    user_email = _get_user_email(request)
+    variant = ""
+    if user_email or req.session_id:
+        variant = billing_service.get_variant(user_email, req.session_id)
+    event_id = billing_service.track(
+        event_type=req.event_type,
+        user_email=user_email,
+        plan_code=req.plan_code,
+        variant=variant,
+        session_id=req.session_id,
+        metadata=req.metadata,
+    )
+    return {"success": True, "event_id": event_id}
+
+
+@router.post("/pricing/checkout", response_model=CheckoutResponse)
+async def create_checkout(req: CheckoutRequest, request: Request):
+    """创建沙箱支付订单（需登录）。"""
+    user_email = _get_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="请先登录后再发起支付")
+    result = billing_service.create_checkout(user_email, req.plan_code, req.pay_method)
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=400, detail=result.get("detail", "创建订单失败")
+        )
+    # 埋点：发起结算
+    billing_service.track("checkout_start", user_email, req.plan_code)
+    return result
+
+
+@router.post("/pricing/payment-callback", response_model=PaymentConfirmResponse)
+async def confirm_payment(req: PaymentConfirmRequest, request: Request):
+    """沙箱支付回调确认（模拟第三方支付回调）。"""
+    user_email = _get_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="请先登录")
+    result = billing_service.confirm_payment(req.order_no, user_email, req.pay_method)
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=400, detail=result.get("detail", "支付确认失败")
+        )
+    return result
+
+
+@router.get("/pricing/orders", response_model=OrdersResponse)
+async def get_orders(request: Request):
+    """获取当前用户的订单列表（需登录）。"""
+    user_email = _get_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="请先登录")
+    return {"orders": billing_service.get_orders(user_email)}
+
+
+@router.get("/pricing/subscription", response_model=SubscriptionResponse)
+async def get_subscription(request: Request):
+    """获取当前用户的有效订阅（需登录）。"""
+    user_email = _get_user_email(request)
+    if not user_email:
+        raise HTTPException(status_code=401, detail="请先登录")
+    return {"subscription": billing_service.get_subscription(user_email)}
+
+
+@router.get("/pricing/funnel", response_model=FunnelSummaryResponse)
+async def get_funnel_summary(hours: int = 24):
+    """获取转化漏斗汇总（供评审现场展示真实数据驱动能力）。"""
+    return billing_service.get_funnel_summary(hours=hours)

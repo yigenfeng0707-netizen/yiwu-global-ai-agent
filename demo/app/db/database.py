@@ -10,7 +10,10 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 
-DB_PATH = os.getenv("DATABASE_PATH", str(Path(__file__).resolve().parent.parent.parent / "data" / "app.db"))
+DB_PATH = os.getenv(
+    "DATABASE_PATH",
+    str(Path(__file__).resolve().parent.parent.parent / "data" / "app.db"),
+)
 
 
 class Database:
@@ -43,7 +46,9 @@ class Database:
             conn = sqlite3.connect(self.db_path, check_same_thread=False)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA synchronous=NORMAL")  # WAL 下 NORMAL 已足够安全，写入更快
+            conn.execute(
+                "PRAGMA synchronous=NORMAL"
+            )  # WAL 下 NORMAL 已足够安全，写入更快
             self._local.conn = conn
         return conn
 
@@ -131,12 +136,62 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(session_id);
                 CREATE INDEX IF NOT EXISTS idx_api_usage_time ON api_usage(created_at);
                 CREATE INDEX IF NOT EXISTS idx_query_history_time ON query_history(created_at);
+                CREATE TABLE IF NOT EXISTS subscriptions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_email TEXT NOT NULL,
+                    plan_code TEXT NOT NULL,
+                    status TEXT DEFAULT 'active',
+                    started_at REAL NOT NULL,
+                    expires_at REAL,
+                    payment_order_id TEXT,
+                    created_at REAL NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS ab_test_assignments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_email TEXT DEFAULT '',
+                    experiment TEXT NOT NULL,
+                    variant TEXT NOT NULL,
+                    assigned_at REAL NOT NULL,
+                    UNIQUE(experiment, user_email)
+                );
+
+                CREATE TABLE IF NOT EXISTS conversion_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_email TEXT DEFAULT '',
+                    event_type TEXT NOT NULL,
+                    plan_code TEXT DEFAULT '',
+                    variant TEXT DEFAULT '',
+                    session_id TEXT DEFAULT '',
+                    metadata_json TEXT DEFAULT '{}',
+                    created_at REAL NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS payment_orders (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    order_no TEXT UNIQUE NOT NULL,
+                    user_email TEXT NOT NULL,
+                    plan_code TEXT NOT NULL,
+                    amount_cny REAL NOT NULL,
+                    status TEXT DEFAULT 'pending',
+                    provider TEXT DEFAULT 'sandbox',
+                    pay_method TEXT DEFAULT '',
+                    created_at REAL NOT NULL,
+                    paid_at REAL,
+                    metadata_json TEXT DEFAULT '{}'
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_real_data_updated ON real_data_cache(updated_at);
+                CREATE INDEX IF NOT EXISTS idx_subscriptions_email ON subscriptions(user_email);
+                CREATE INDEX IF NOT EXISTS idx_conversion_events_type ON conversion_events(event_type);
+                CREATE INDEX IF NOT EXISTS idx_payment_orders_email ON payment_orders(user_email);
             """)
 
     # ==================== 用户管理 ====================
 
-    def create_user(self, email: str, password_hash: str, company: str = "") -> Optional[int]:
+    def create_user(
+        self, email: str, password_hash: str, company: str = ""
+    ) -> Optional[int]:
         """创建用户，返回用户ID；邮箱已存在返回None"""
         try:
             with self._get_conn() as conn:
@@ -144,14 +199,16 @@ class Database:
                     "INSERT INTO users (email, password_hash, company, created_at) VALUES (?, ?, ?, ?)",
                     (email, password_hash, company, time.time()),
                 )
-                return cursor.lastrowid
+            return int(cursor.lastrowid or 0)
         except sqlite3.IntegrityError:
             return None
 
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         """根据邮箱获取用户"""
         with self._get_conn() as conn:
-            row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM users WHERE email = ?", (email,)
+            ).fetchone()
             if row:
                 return dict(row)
             return None
@@ -159,7 +216,9 @@ class Database:
     def update_last_login(self, email: str):
         """更新最后登录时间"""
         with self._get_conn() as conn:
-            conn.execute("UPDATE users SET last_login = ? WHERE email = ?", (time.time(), email))
+            conn.execute(
+                "UPDATE users SET last_login = ? WHERE email = ?", (time.time(), email)
+            )
 
     def get_user_count(self) -> int:
         """获取用户总数"""
@@ -168,9 +227,16 @@ class Database:
 
     # ==================== 会话管理 ====================
 
-    def save_chat_message(self, session_id: str, role: str, content: str,
-                          emotion: str = "", category: str = "", language: str = "zh",
-                          user_email: str = ""):
+    def save_chat_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        emotion: str = "",
+        category: str = "",
+        language: str = "zh",
+        user_email: str = "",
+    ):
         """保存聊天消息"""
         now = time.time()
         with self._get_conn() as conn:
@@ -195,7 +261,9 @@ class Database:
                 (now, session_id),
             )
 
-    def get_chat_history(self, session_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_chat_history(
+        self, session_id: str, limit: int = 50
+    ) -> List[Dict[str, Any]]:
         """获取会话聊天历史"""
         with self._get_conn() as conn:
             rows = conn.execute(
@@ -211,8 +279,14 @@ class Database:
 
     # ==================== API用量追踪 ====================
 
-    def record_api_usage(self, endpoint: str, method: str = "GET", status_code: int = 200,
-                         duration_ms: float = 0, user_email: str = ""):
+    def record_api_usage(
+        self,
+        endpoint: str,
+        method: str = "GET",
+        status_code: int = 200,
+        duration_ms: float = 0,
+        user_email: str = "",
+    ):
         """记录API调用"""
         with self._get_conn() as conn:
             conn.execute(
@@ -232,30 +306,48 @@ class Database:
                 "SELECT endpoint, COUNT(*) as cnt FROM api_usage WHERE created_at > ? GROUP BY endpoint ORDER BY cnt DESC LIMIT 10",
                 (cutoff,),
             ).fetchall()
-            avg_duration = conn.execute(
-                "SELECT AVG(duration_ms) FROM api_usage WHERE created_at > ? AND duration_ms > 0",
-                (cutoff,),
-            ).fetchone()[0] or 0
+            avg_duration = (
+                conn.execute(
+                    "SELECT AVG(duration_ms) FROM api_usage WHERE created_at > ? AND duration_ms > 0",
+                    (cutoff,),
+                ).fetchone()[0]
+                or 0
+            )
             return {
                 "total_calls": total,
                 "period_hours": hours,
                 "avg_duration_ms": round(avg_duration, 2),
-                "top_endpoints": [{"endpoint": r["endpoint"], "count": r["cnt"]} for r in by_endpoint],
+                "top_endpoints": [
+                    {"endpoint": r["endpoint"], "count": r["cnt"]} for r in by_endpoint
+                ],
             }
 
     # ==================== 查询历史 ====================
 
-    def record_query(self, agent_name: str, params: Dict[str, Any], result_summary: str = "",
-                     user_email: str = ""):
+    def record_query(
+        self,
+        agent_name: str,
+        params: Dict[str, Any],
+        result_summary: str = "",
+        user_email: str = "",
+    ):
         """记录Agent查询历史"""
         with self._get_conn() as conn:
             conn.execute(
                 "INSERT INTO query_history (user_email, agent_name, params_json, result_summary, created_at) "
                 "VALUES (?, ?, ?, ?, ?)",
-                (user_email, agent_name, json.dumps(params, ensure_ascii=False), result_summary, time.time()),
+                (
+                    user_email,
+                    agent_name,
+                    json.dumps(params, ensure_ascii=False),
+                    result_summary,
+                    time.time(),
+                ),
             )
 
-    def get_query_history(self, user_email: str = "", limit: int = 20) -> List[Dict[str, Any]]:
+    def get_query_history(
+        self, user_email: str = "", limit: int = 20
+    ) -> List[Dict[str, Any]]:
         """获取查询历史"""
         with self._get_conn() as conn:
             if user_email:
@@ -265,7 +357,8 @@ class Database:
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    "SELECT * FROM query_history ORDER BY created_at DESC LIMIT ?", (limit,)
+                    "SELECT * FROM query_history ORDER BY created_at DESC LIMIT ?",
+                    (limit,),
                 ).fetchall()
             return [dict(r) for r in rows]
 
@@ -334,6 +427,179 @@ class Database:
                     record["payload"] = {}
                 out.append(record)
             return out
+
+    # ==================== 商业化：A/B 测试分桶 ====================
+
+    def get_ab_variant(
+        self, experiment: str, user_email: str
+    ) -> Optional[Dict[str, Any]]:
+        """取已分配的 A/B 变体；无记录返 None。"""
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT variant, assigned_at FROM ab_test_assignments WHERE experiment = ? AND user_email = ?",
+                (experiment, user_email),
+            ).fetchone()
+            if row:
+                return {"variant": row["variant"], "assigned_at": row["assigned_at"]}
+            return None
+
+    def save_ab_variant(self, experiment: str, user_email: str, variant: str) -> str:
+        """INSERT OR IGNORE：已分配则不覆盖（同一用户同一实验永远不变体）。"""
+        with self._get_conn() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO ab_test_assignments (experiment, user_email, variant, assigned_at) VALUES (?, ?, ?, ?)",
+                (experiment, user_email, variant, time.time()),
+            )
+            row = conn.execute(
+                "SELECT variant FROM ab_test_assignments WHERE experiment = ? AND user_email = ?",
+                (experiment, user_email),
+            ).fetchone()
+            return row["variant"] if row else variant
+
+    # ==================== 商业化：转化事件埋点 ====================
+
+    def track_event(
+        self,
+        event_type: str,
+        user_email: str = "",
+        plan_code: str = "",
+        variant: str = "",
+        session_id: str = "",
+        metadata: Optional[Dict] = None,
+    ) -> int:
+        """记录一条转化事件，返回事件 ID。"""
+        with self._get_conn() as conn:
+            cursor = conn.execute(
+                """INSERT INTO conversion_events
+                   (event_type, user_email, plan_code, variant, session_id, metadata_json, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    event_type,
+                    user_email,
+                    plan_code,
+                    variant,
+                    session_id,
+                    json.dumps(metadata or {}, ensure_ascii=False),
+                    time.time(),
+                ),
+            )
+            return int(cursor.lastrowid or 0)
+
+    def get_events_summary(self, hours: int = 24) -> List[Dict[str, Any]]:
+        """取最近 N 小时内各 event_type 的计数，按计数降序。"""
+        cutoff = time.time() - hours * 3600
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                """SELECT event_type, COUNT(*) as cnt
+                   FROM conversion_events WHERE created_at >= ?
+                   GROUP BY event_type ORDER BY cnt DESC""",
+                (cutoff,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    # ==================== 商业化：支付订单 ====================
+
+    def create_order(
+        self,
+        order_no: str,
+        user_email: str,
+        plan_code: str,
+        amount_cny: float,
+        provider: str = "sandbox",
+        metadata: Optional[Dict] = None,
+    ) -> Dict[str, Any]:
+        """创建支付订单，返回订单记录。"""
+        with self._get_conn() as conn:
+            conn.execute(
+                """INSERT INTO payment_orders
+                   (order_no, user_email, plan_code, amount_cny, status, provider, metadata_json, created_at)
+                   VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)""",
+                (
+                    order_no,
+                    user_email,
+                    plan_code,
+                    amount_cny,
+                    provider,
+                    json.dumps(metadata or {}, ensure_ascii=False),
+                    time.time(),
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM payment_orders WHERE order_no = ?", (order_no,)
+            ).fetchone()
+            return dict(row) if row else {}
+
+    def get_order(self, order_no: str) -> Optional[Dict[str, Any]]:
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM payment_orders WHERE order_no = ?", (order_no,)
+            ).fetchone()
+            return dict(row) if row else None
+
+    def update_order_status(
+        self, order_no: str, status: str, pay_method: str = ""
+    ) -> bool:
+        """更新订单状态；status 为 'paid' 时同时写 paid_at。"""
+        with self._get_conn() as conn:
+            if status == "paid":
+                conn.execute(
+                    "UPDATE payment_orders SET status = ?, pay_method = ?, paid_at = ? WHERE order_no = ?",
+                    (status, pay_method, time.time(), order_no),
+                )
+            else:
+                conn.execute(
+                    "UPDATE payment_orders SET status = ? WHERE order_no = ?",
+                    (status, order_no),
+                )
+            return conn.total_changes > 0
+
+    def list_orders(self, user_email: str, limit: int = 20) -> List[Dict[str, Any]]:
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM payment_orders WHERE user_email = ? ORDER BY created_at DESC LIMIT ?",
+                (user_email, limit),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    # ==================== 商业化：订阅 ====================
+
+    def create_subscription(
+        self,
+        user_email: str,
+        plan_code: str,
+        payment_order_id: str,
+        duration_days: int = 30,
+    ) -> Dict[str, Any]:
+        started = time.time()
+        expires = started + duration_days * 86400
+        with self._get_conn() as conn:
+            cursor = conn.execute(
+                """INSERT INTO subscriptions
+                   (user_email, plan_code, status, started_at, expires_at, payment_order_id, created_at)
+                   VALUES (?, ?, 'active', ?, ?, ?, ?)""",
+                (
+                    user_email,
+                    plan_code,
+                    started,
+                    expires,
+                    payment_order_id,
+                    time.time(),
+                ),
+            )
+            sub_id = cursor.lastrowid
+            row = conn.execute(
+                "SELECT * FROM subscriptions WHERE id = ?", (sub_id,)
+            ).fetchone()
+            return dict(row) if row else {}
+
+    def get_subscription(self, user_email: str) -> Optional[Dict[str, Any]]:
+        """取用户当前有效订阅（最近一条 active）。"""
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM subscriptions WHERE user_email = ? AND status = 'active' ORDER BY started_at DESC LIMIT 1",
+                (user_email,),
+            ).fetchone()
+            return dict(row) if row else None
 
     # ==================== LLM 日计数（P3-2：从 JSON 文件迁 SQLite） ====================
 

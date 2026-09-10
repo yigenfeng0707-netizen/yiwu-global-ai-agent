@@ -1,13 +1,15 @@
 """义乌小商品出海智能体 - 智能客服Agent"""
 
-import random
 import re
 from typing import Any, Dict, List, Optional
 
 from .base import BaseAgent
 from ..data.market_data import CATEGORY_LIST
 from ..data.customer_service_data import (
-    FAQ_DATABASE, EMOTION_TYPES, DISPUTE_KEYWORDS, AUTO_REPLY_TEMPLATES,
+    FAQ_DATABASE,
+    EMOTION_TYPES,
+    DISPUTE_KEYWORDS,
+    AUTO_REPLY_TEMPLATES,
 )
 from ..services.llm import llm_service
 
@@ -43,20 +45,31 @@ class CustomerServiceAgent(BaseAgent):
         dispute = self._detect_dispute(message)
 
         # 生成回复
-        reply = await self._generate_reply(message, category, language, faq_match, emotion, dispute, session_id)
+        reply = await self._generate_reply(
+            message, category, language, faq_match, emotion, dispute, session_id
+        )
 
         # 是否需要转人工
-        needs_human = dispute.get("detected", False) and emotion.get("type") == "negative"
+        needs_human = (
+            dispute.get("detected", False) and emotion.get("type") == "negative"
+        )
 
         # 记录会话到数据库
         try:
             self._db.save_chat_message(
-                session_id=session_id, role="user", content=message,
-                emotion=emotion.get("type", ""), category=category, language=language,
+                session_id=session_id,
+                role="user",
+                content=message,
+                emotion=emotion.get("type", ""),
+                category=category,
+                language=language,
             )
             self._db.save_chat_message(
-                session_id=session_id, role="bot", content=reply.get("text", ""),
-                category=category, language=language,
+                session_id=session_id,
+                role="bot",
+                content=reply.get("text", ""),
+                category=category,
+                language=language,
             )
         except Exception:
             pass  # 数据库记录失败不影响主流程
@@ -67,14 +80,16 @@ class CustomerServiceAgent(BaseAgent):
         self.sessions[session_id].append({"role": "user", "text": message})
         self.sessions[session_id].append({"role": "bot", "text": reply.get("text", "")})
 
-        return self._wrap_response({
-            "reply": reply,
-            "emotion": emotion,
-            "dispute": dispute,
-            "faq_match": faq_match,
-            "needs_human_escalation": needs_human,
-            "session_id": session_id,
-        })
+        return self._wrap_response(
+            {
+                "reply": reply,
+                "emotion": emotion,
+                "dispute": dispute,
+                "faq_match": faq_match,
+                "needs_human_escalation": needs_human,
+                "session_id": session_id,
+            }
+        )
 
     async def get_faq(self, category: str, language: str = "zh") -> Dict[str, Any]:
         """获取FAQ列表"""
@@ -83,7 +98,18 @@ class CustomerServiceAgent(BaseAgent):
 
     def _detect_emotion(self, message: str) -> Dict[str, Any]:
         """情绪检测"""
-        negative_words = ["不满", "差评", "失望", "愤怒", "投诉", "退款", "赔偿", "差", "烂", "骗"]
+        negative_words = [
+            "不满",
+            "差评",
+            "失望",
+            "愤怒",
+            "投诉",
+            "退款",
+            "赔偿",
+            "差",
+            "烂",
+            "骗",
+        ]
         positive_words = ["满意", "好", "棒", "赞", "感谢", "喜欢", "优秀"]
 
         msg_lower = message.lower()
@@ -94,7 +120,9 @@ class CustomerServiceAgent(BaseAgent):
         else:
             return {"type": "neutral", "label": "中性", "color": "#9ca3af"}
 
-    def _match_faq(self, message: str, category: str, language: str) -> Optional[Dict[str, Any]]:
+    def _match_faq(
+        self, message: str, category: str, language: str
+    ) -> Optional[Dict[str, Any]]:
         """FAQ匹配"""
         faqs = FAQ_DATABASE.get(category, []) + FAQ_DATABASE.get("出海咨询", [])
         best_match = None
@@ -134,9 +162,12 @@ class CustomerServiceAgent(BaseAgent):
 
         return {"detected": detected, "type": dispute_type}
 
-    async def _llm_chat(self, message: str, session_id: str = "default") -> Optional[str]:
+    async def _llm_chat(
+        self, message: str, session_id: str = "default"
+    ) -> Optional[str]:
         """调用DashScope Qwen模型生成回复（含超时保护）"""
         import asyncio
+
         # 构建对话历史
         history = self.sessions.get(session_id, [])
         messages = [{"role": "system", "content": self.LLM_SYSTEM_PROMPT}]
@@ -155,9 +186,16 @@ class CustomerServiceAgent(BaseAgent):
         except (asyncio.TimeoutError, Exception):
             return None
 
-    async def _generate_reply(self, message: str, category: str, language: str,
-                              faq_match: Optional[Dict], emotion: Dict, dispute: Dict,
-                              session_id: str = "default") -> Dict[str, Any]:
+    async def _generate_reply(
+        self,
+        message: str,
+        category: str,
+        language: str,
+        faq_match: Optional[Dict],
+        emotion: Dict,
+        dispute: Dict,
+        session_id: str = "default",
+    ) -> Dict[str, Any]:
         """生成回复"""
         # FAQ匹配回复优先
         if faq_match:

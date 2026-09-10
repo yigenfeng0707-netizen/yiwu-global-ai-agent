@@ -42,7 +42,7 @@
 
 | BP 中的数字 | 复现方法 | 置信度 |
 |---|---|---|
-| **144 个自动化单元测试全绿** | `cd demo && python -m pytest tests/ -q`（CI 已固化，GitHub Actions 每次提交自动跑；含 P1-1 新增 test_etl.py 28 用例） | ★★★ |
+| **177 个自动化单元测试全绿** | `cd demo && python -m pytest tests/ -q`（CI 已固化，GitHub Actions 每次提交自动跑；含 P1-1 新增 test_etl.py 28 用例 + P3-5 新增 billing 测试） | ★★★ |
 | **7大AI Agent全链路** | 演示站"全链路"页一键运行：https://gsym236998-yiwu-global-ai-agent.ms.show | ★★★ |
 | LLM 真实接入（非静态数据） | 演示站顶栏数据源状态徽章据后端 `/status` 真值三态显示（真实/降级/演示，P0-5 已移除会说谎的"AI已接入"固定绿灯）；市场洞察页义乌指数卡片有"官方发布值·真实数据"绿色徽章 + AI 商业洞察卡片；CI 部署后自动冒烟断言 ai_insight | ★★★ |
 | LangGraph 多Agent编排 | `demo/app/agents/workflow.py`（StateGraph 7节点+条件路由，源码可查） | ★★★ |
