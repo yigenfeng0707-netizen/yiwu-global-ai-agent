@@ -7,17 +7,27 @@ import tempfile
 from app.services.auth import AuthService, _hash_password, _verify_password
 from app.services.llm import LLMService
 from app.models.schemas import (
-    ContentGenerateRequest, CustomerChatRequest, TariffCalcRequest,
-    LoginRequest, RegisterRequest, PipelineRequest, SupplyChainRequest,
+    ContentGenerateRequest,
+    CustomerChatRequest,
+    TariffCalcRequest,
+    LoginRequest,
+    RegisterRequest,
+    PipelineRequest,
+    SupplyChainRequest,
     PolicyBenefitCalcRequest,
 )
 from app.data.sources import (
-    DataSourceManager, YiwuMarketDataSource, YixinouLogisticsDataSource,
-    AmazonDataSource, AlibabaDataSource, IndustryReportDataSource,
+    DataSourceManager,
+    YiwuMarketDataSource,
+    YixinouLogisticsDataSource,
+    AmazonDataSource,
+    AlibabaDataSource,
+    IndustryReportDataSource,
 )
 
 
 # ==================== 认证服务 ====================
+
 
 class TestAuthService:
     @pytest.fixture
@@ -26,6 +36,7 @@ class TestAuthService:
         os.environ["DATABASE_PATH"] = path
         # 重新导入以使用新数据库路径
         from app.db.database import Database
+
         db = Database(db_path=path)
         service = AuthService()
         service.db = db
@@ -75,11 +86,13 @@ class TestAuthService:
         assert _verify_password("wrong", h1) is False
         # legacy 静态盐 SHA256 向后兼容（P2 前的老用户仍可登录）
         import hashlib
+
         legacy = hashlib.sha256("yiwu-chuhai:test".encode()).hexdigest()
         assert _verify_password("test", legacy) is True
 
 
 # ==================== LLM服务 ====================
+
 
 class TestLLMService:
     def test_init_defaults(self):
@@ -103,7 +116,11 @@ class TestLLMService:
 
     def test_fallback_config_missing(self, monkeypatch):
         """未配置备选模型时不启用降级"""
-        for var in ("LLM_FALLBACK_API_KEY", "LLM_FALLBACK_BASE_URL", "LLM_FALLBACK_MODEL"):
+        for var in (
+            "LLM_FALLBACK_API_KEY",
+            "LLM_FALLBACK_BASE_URL",
+            "LLM_FALLBACK_MODEL",
+        ):
             monkeypatch.delenv(var, raising=False)
         service = LLMService()
         assert service.fallback == {}
@@ -130,8 +147,16 @@ class TestLLMService:
 
         calls = []
 
-        async def fake_request(messages, temperature, max_tokens, *, base_url=None,
-                               api_key=None, model=None, request_extras=None):
+        async def fake_request(
+            messages,
+            temperature,
+            max_tokens,
+            *,
+            base_url=None,
+            api_key=None,
+            model=None,
+            request_extras=None,
+        ):
             calls.append({"base_url": base_url, "model": model})
             if base_url is None or base_url == service.base_url:
                 return None, None  # 主模型失败
@@ -157,23 +182,36 @@ class TestLLMService:
         monkeypatch.setattr(service, "_request_sync", always_fail)
         # 连续3次备选失败，应触发熔断冷却
         for _ in range(3):
-            assert service._chat_fallback_sync([{"role": "user", "content": "hi"}], 0.7, 300) is None
+            assert (
+                service._chat_fallback_sync(
+                    [{"role": "user", "content": "hi"}], 0.7, 300
+                )
+                is None
+            )
         assert service._fallback_cooldown_until > time.time()
         # 冷却期内不再发起备选请求
         called = []
-        monkeypatch.setattr(service, "_request_sync",
-                            lambda m, t, k, **kw: called.append(1) or (None, None))
-        assert service._chat_fallback_sync([{"role": "user", "content": "hi"}], 0.7, 300) is None
+        monkeypatch.setattr(
+            service,
+            "_request_sync",
+            lambda m, t, k, **kw: called.append(1) or (None, None),
+        )
+        assert (
+            service._chat_fallback_sync([{"role": "user", "content": "hi"}], 0.7, 300)
+            is None
+        )
         assert called == []
 
     def test_daily_count_persistence(self, monkeypatch, tmp_path):
         """P3-2：日计数落 SQLite 并在重启后恢复（同一天）"""
         # 重置全局单例，让 get_db() 指向 tmp_path（否则模块加载时已用原 DB_PATH 初始化）
         import app.db.database as db_mod
+
         monkeypatch.setattr(db_mod, "_db_instance", None)
         monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "app.db"))
         # 预初始化单例指向 tmp_path
         from app.db.database import Database, get_db
+
         monkeypatch.setattr(db_mod, "_db_instance", Database(str(tmp_path / "app.db")))
 
         service = LLMService()
@@ -184,6 +222,7 @@ class TestLLMService:
         # 验证已落 SQLite（权威源），不再写 JSON
         db = get_db()
         from datetime import date
+
         assert db.get_llm_daily_count(date.today().isoformat()) == 2
         # 旧 JSON 文件不应存在（P3-2 起已弃用）
         assert not (tmp_path / "llm_daily_count.json").exists()
@@ -202,11 +241,14 @@ class TestLLMService:
         """P3-2：首次启动从旧 JSON 文件一次性迁移到 SQLite，读完即删"""
         import json
         from datetime import date
+
         # 重置全局单例指向 tmp_path
         import app.db.database as db_mod
+
         monkeypatch.setattr(db_mod, "_db_instance", None)
         monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "app.db"))
         from app.db.database import Database, get_db
+
         monkeypatch.setattr(db_mod, "_db_instance", Database(str(tmp_path / "app.db")))
 
         # 预置旧 JSON 文件（模拟 P3-2 之前的状态）
@@ -226,6 +268,7 @@ class TestLLMService:
 
 
 # ==================== Pydantic模型 ====================
+
 
 class TestSchemas:
     def test_content_request_defaults(self):
@@ -248,6 +291,7 @@ class TestSchemas:
 
 
 # ==================== 数据源管理 ====================
+
 
 class TestDataSources:
     def test_manager_init(self):
@@ -275,7 +319,7 @@ class TestDataSources:
     def test_yixinou_logistics(self):
         source = YixinouLogisticsDataSource()
         result = source.fetch()
-        assert result["total_routes"] == 19
+        assert result["total_routes"] == 27
         assert len(result["routes"]) > 0
 
     def test_amazon_data(self):

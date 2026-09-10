@@ -173,10 +173,12 @@ class YiwuMarketDataSource(DataSourceBase):
 
 
 class YixinouLogisticsDataSource(DataSourceBase):
-    """义新欧班列物流数据源"""
+    """义新欧班列物流数据源（运营线路已由真实 ETL 源提供）"""
 
     name = "义新欧班列"
-    description = "义新欧班列19条线路、50国160城物流数据"
+    description = (
+        "义新欧班列27条线路、50国160城物流数据（线路已接真实源 yixinou.com/lines）"
+    )
 
     ROUTES = [
         {
@@ -243,7 +245,7 @@ class YixinouLogisticsDataSource(DataSourceBase):
             routes = [r for r in routes if region in r["name"]]
         return {
             "source": self.name,
-            "total_routes": 19,
+            "total_routes": 27,
             "countries_covered": 50,
             "cities_connected": 160,
             "annual_trips": 1600,

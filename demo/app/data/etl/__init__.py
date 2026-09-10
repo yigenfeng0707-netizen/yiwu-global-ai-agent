@@ -15,6 +15,7 @@
 from .base import FetchResult, RealDataSource
 from .exchange_rate import ExchangeRateSource
 from .yiwu_index import YiwuIndexSource
+from .yixinou import YixinouSource
 from .registry import RealDataRegistry, get_registry, DataSourceStatus
 
 __all__ = [
@@ -22,6 +23,7 @@ __all__ = [
     "RealDataSource",
     "ExchangeRateSource",
     "YiwuIndexSource",
+    "YixinouSource",
     "RealDataRegistry",
     "get_registry",
     "DataSourceStatus",

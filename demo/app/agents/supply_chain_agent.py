@@ -5,10 +5,14 @@ from typing import Any, Dict, List, Tuple
 
 from .base import BaseAgent
 from ..data.market_data import (
-    MARKET_DATA, CATEGORY_LIST, YIWU_TRADE_CITY, YIXINOU_DATA,
+    MARKET_DATA,
+    CATEGORY_LIST,
+    YIWU_TRADE_CITY,
+    YIXINOU_DATA,
     MARKET_PURCHASE_TRADE_1039,
 )
 from ..data.sources import DataSourceManager
+from ..data.etl import get_registry
 from ..services.llm import llm_service
 
 
@@ -16,7 +20,9 @@ def _clamp(v: float, lo: int = 40, hi: int = 95) -> int:
     return int(max(lo, min(hi, round(v))))
 
 
-def _parse_price_range(s: Any, default: Tuple[float, float] = (1.0, 10.0)) -> Tuple[float, float]:
+def _parse_price_range(
+    s: Any, default: Tuple[float, float] = (1.0, 10.0)
+) -> Tuple[float, float]:
     """从 '$0.5-15' / '$1.5-8' 之类字符串解析价格区间 (low, high)。"""
     nums = re.findall(r"[\d.]+", str(s))
     try:
@@ -55,52 +61,64 @@ class SupplyChainAgent(BaseAgent):
         trade_1039 = self._get_1039_info(category)
         score = self._calculate_supply_score(category, region)
 
-        result = self._wrap_response({
-            "category": category,
-            "region": region,
-            "budget": budget,
-            "suppliers": suppliers,
-            "purchase_info": purchase_info,
-            "logistics": logistics,
-            "trade_1039": trade_1039,
-            "supply_score": score,
-            "yiwu_trade_city": {
-                "total_shops": YIWU_TRADE_CITY["total_shops"],
-                "total_skus": YIWU_TRADE_CITY["total_skus"],
-                "district": self._get_district(category),
-            },
-        })
+        result = self._wrap_response(
+            {
+                "category": category,
+                "region": region,
+                "budget": budget,
+                "suppliers": suppliers,
+                "purchase_info": purchase_info,
+                "logistics": logistics,
+                "trade_1039": trade_1039,
+                "supply_score": score,
+                "yiwu_trade_city": {
+                    "total_shops": YIWU_TRADE_CITY["total_shops"],
+                    "total_skus": YIWU_TRADE_CITY["total_skus"],
+                    "district": self._get_district(category),
+                },
+            }
+        )
 
         # LLM 增强：生成采购与物流策略建议（无 API Key 时降级）
-        advice = await self._llm_supply_advice(category, region, budget, suppliers, score)
+        advice = await self._llm_supply_advice(
+            category, region, budget, suppliers, score
+        )
         if advice:
             result["ai_recommendation"] = advice.strip()
             result["ai_used"] = True
         else:
             result["ai_used"] = False
 
-        self.record_query({"category": category, "region": region, "budget": budget},
-                          f"供应链评分{score['total']}/{score['level']}")
+        self.record_query(
+            {"category": category, "region": region, "budget": budget},
+            f"供应链评分{score['total']}/{score['level']}",
+        )
         return result
 
-    def _match_suppliers(self, category: str, region: str, budget: str) -> List[Dict[str, Any]]:
+    def _match_suppliers(
+        self, category: str, region: str, budget: str
+    ) -> List[Dict[str, Any]]:
         """匹配供应商（确定性：价格由品类价格区间推导，MOQ/交期/评分按序号阶梯）"""
         market_data = MARKET_DATA.get(category, {})
         hot_products = market_data.get("hot_products", [])
         low, high = _parse_price_range(market_data.get("avg_price_range", "$1-10"))
 
         supplier_names = [
-            "义乌市鑫达贸易有限公司", "义乌市恒丰进出口有限公司",
-            "义乌市华美工贸有限公司", "义乌市盛达商贸有限公司",
-            "义乌市远东国际贸易有限公司", "义乌市金桥进出口有限公司",
-            "义乌市新纪元商贸有限公司", "义乌市环球小商品有限公司",
+            "义乌市鑫达贸易有限公司",
+            "义乌市恒丰进出口有限公司",
+            "义乌市华美工贸有限公司",
+            "义乌市盛达商贸有限公司",
+            "义乌市远东国际贸易有限公司",
+            "义乌市金桥进出口有限公司",
+            "义乌市新纪元商贸有限公司",
+            "义乌市环球小商品有限公司",
         ]
 
         suppliers = []
         products = hot_products[:6] or [category]
         span = max(high - low, 0.1)
         for i, product in enumerate(products):
-            frac = (i % 5) / 5                       # 0,0.2,0.4,0.6,0.8 确定性分布
+            frac = (i % 5) / 5  # 0,0.2,0.4,0.6,0.8 确定性分布
             price_base = round(low + span * frac * 0.6, 2)
             moq = self._MOQ_LADDER[i % len(self._MOQ_LADDER)]
             if budget == "低":
@@ -109,17 +127,21 @@ class SupplyChainAgent(BaseAgent):
                 moq = moq * 2
             rating = round(max(4.0, min(4.9, 4.9 - i * 0.12)), 1)
 
-            suppliers.append({
-                "supplier": supplier_names[i % len(supplier_names)],
-                "product": product,
-                "district": self._get_district(category),
-                "moq": moq,
-                "unit_price": f"${price_base}-{round(price_base * 1.5, 2)}",
-                "delivery_days": self._DELIVERY_LADDER[i % len(self._DELIVERY_LADDER)],
-                "rating": rating,
-                "certifications": self._get_certifications(category, region),
-                "recommended": i < 3,
-            })
+            suppliers.append(
+                {
+                    "supplier": supplier_names[i % len(supplier_names)],
+                    "product": product,
+                    "district": self._get_district(category),
+                    "moq": moq,
+                    "unit_price": f"${price_base}-{round(price_base * 1.5, 2)}",
+                    "delivery_days": self._DELIVERY_LADDER[
+                        i % len(self._DELIVERY_LADDER)
+                    ],
+                    "rating": rating,
+                    "certifications": self._get_certifications(category, region),
+                    "recommended": i < 3,
+                }
+            )
 
         return suppliers
 
@@ -140,14 +162,47 @@ class SupplyChainAgent(BaseAgent):
         }
 
     def _get_logistics(self, region: str) -> Dict[str, Any]:
-        """获取义新欧班列物流信息"""
-        logistics_data = self.data_manager.fetch_by_source("义新欧班列", "", region)
+        """获取义新欧班列物流信息（优先真实 ETL 源，回退演示基准值）"""
+        # P4-3：优先从真实 ETL 源获取义新欧运营线路
+        reg = get_registry()
+        real = reg.get_yixinou_routes(region)
+        if real.get("is_real"):
+            # 真实线路数据 + 演示时效/运费（诚实标注：线路为真实，时效/运费仍为演示）
+            return {
+                "source": "义新欧班列",
+                "is_real_routes": True,
+                "total_routes": real.get("total_routes", 0),
+                "total_routes_reported": real.get("total_routes_reported", 27),
+                "countries_covered": real.get("countries_covered", 50),
+                "cities_connected": real.get("cities_connected", 160),
+                "routes": real.get("routes", []),
+                "routes_by_region": real.get("routes_by_region", {}),
+                "route_source_url": real.get("source_url", ""),
+                "route_fetched_at": real.get("fetched_at_iso", ""),
+                "route_note": real.get("note", ""),
+                # 时效/运费仍为演示静态值（非官网实时运踪/运价）
+                "static_demo_fields": ["transit_days", "cost_per_container"],
+                "advantages": [
+                    "比海运快2-3倍",
+                    "比空运便宜60-80%",
+                    "通关便利化，优先查验",
+                    "1039市场采购贸易简化申报",
+                    "义乌始发，直接装箱发运",
+                ],
+            }
+
+        # 回退：演示基准值（诚实标注 is_real_routes=False）
+        # 注意：传 region="" 取全部线路，避免 demo 路由名不含"欧洲"关键词导致空列表
+        logistics_data = self.data_manager.fetch_by_source("义新欧班列", "", "")
         if logistics_data:
+            logistics_data["is_real_routes"] = False
+            logistics_data["route_note"] = "义新欧真实源不可用，回退演示基准线路"
             return logistics_data
 
         return {
             "source": "义新欧班列",
-            "total_routes": 19,
+            "is_real_routes": False,
+            "total_routes": 27,
             "countries_covered": 50,
             "cities_connected": 160,
             "routes": YIXINOU_DATA["main_routes"],
@@ -179,7 +234,15 @@ class SupplyChainAgent(BaseAgent):
         logistics_bonus = 6 if region and ("欧洲" in region or "中亚" in region) else 0
 
         total_score = _clamp(yiwu - 3 + logistics_bonus, 60, 95)
-        level = "优秀" if total_score >= 80 else "良好" if total_score >= 70 else "一般" if total_score >= 60 else "较差"
+        level = (
+            "优秀"
+            if total_score >= 80
+            else "良好"
+            if total_score >= 70
+            else "一般"
+            if total_score >= 60
+            else "较差"
+        )
 
         return {
             "total": total_score,
@@ -196,11 +259,16 @@ class SupplyChainAgent(BaseAgent):
     def _get_district(self, category: str) -> str:
         """获取品类所在商贸城区"""
         district_map = {
-            "玩具": "一区", "工艺品": "一区",
-            "五金工具": "二区", "电子电器": "二区",
-            "文具办公用品": "三区", "日用百货": "三区",
-            "服装服饰": "四区", "针织品": "四区",
-            "饰品配件": "五区", "家居装饰": "五区",
+            "玩具": "一区",
+            "工艺品": "一区",
+            "五金工具": "二区",
+            "电子电器": "二区",
+            "文具办公用品": "三区",
+            "日用百货": "三区",
+            "服装服饰": "四区",
+            "针织品": "四区",
+            "饰品配件": "五区",
+            "家居装饰": "五区",
         }
         return district_map.get(category, "综合区")
 
@@ -227,8 +295,14 @@ class SupplyChainAgent(BaseAgent):
                 certs.append("SABER(沙特)")
         return certs
 
-    async def _llm_supply_advice(self, category: str, region: str, budget: str,
-                                 suppliers: List[Dict[str, Any]], score: Dict[str, Any]) -> Any:
+    async def _llm_supply_advice(
+        self,
+        category: str,
+        region: str,
+        budget: str,
+        suppliers: List[Dict[str, Any]],
+        score: Dict[str, Any],
+    ) -> Any:
         """调用 LLM 生成采购与物流策略建议；未配置 API Key 时返回 None（降级）。"""
         if not llm_service.api_key:
             return None
@@ -243,5 +317,6 @@ class SupplyChainAgent(BaseAgent):
         return await self.llm_generate(
             prompt,
             system_prompt="你是义乌小商品城资深供应链与跨境物流专家，精通 1039 市场采购贸易与义新欧班列，回答专业、简洁、可执行。",
-            temperature=0.5, max_tokens=420,
+            temperature=0.5,
+            max_tokens=420,
         )

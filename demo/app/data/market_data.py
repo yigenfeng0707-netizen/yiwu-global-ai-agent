@@ -45,7 +45,7 @@ YIWU_INDEX = {
 
 # 义新欧班列数据
 YIXINOU_DATA = {
-    "total_routes": 19,
+    "total_routes": 27,
     "countries_covered": 50,
     "cities_connected": 160,
     "annual_trips": 1600,
