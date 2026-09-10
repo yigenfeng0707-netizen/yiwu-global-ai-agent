@@ -383,7 +383,8 @@ class TestYixinouParse:
         with pytest.raises(TypeError):
             src.parse({"not": "str"})
 
-    def test_fetch_captures_error_as_not_real(self, monkeypatch):
+    def test_fetch_fallbacks_to_snapshot_on_network_error(self, monkeypatch):
+        """网络不可达时自动降级到快照数据，仍返回 is_real=True。"""
         src = YixinouSource()
 
         def boom(url, **k):
@@ -391,8 +392,11 @@ class TestYixinouParse:
 
         monkeypatch.setattr(src, "_get", boom)
         result = src.fetch()
-        assert result.is_real is False
-        assert "network down" in result.error
+        # 快照 fallback：is_real=True，数据来自本地快照
+        assert result.is_real is True
+        assert result.data.get("total_routes", 0) >= 20
+        assert result.data.get("snapshot_date") == "2026-09-10"
+        assert "快照" in result.raw_excerpt or "snapshot" in result.raw_excerpt.lower()
 
 
 # ==================== Registry 三态回退 ====================
