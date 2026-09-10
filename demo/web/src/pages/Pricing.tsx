@@ -47,7 +47,7 @@ function getSessionId(): string {
 
 export default function Pricing() {
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useStore();
+  const { isAuthenticated } = useStore();
 
   const [plans, setPlans] = useState<PricingPlan[]>([]);
   const [variant, setVariant] = useState('');
