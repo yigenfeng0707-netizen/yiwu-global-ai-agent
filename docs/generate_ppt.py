@@ -869,14 +869,14 @@ def slide_tech_arch():
         ('服务层', 'FastAPI + LangGraph', [
             'LangGraph多Agent编排',
             'FastAPI高性能接口',
-            'Redis消息队列',
-            'PostgreSQL数据持久化',
+            'SSE实时进度推流',
+            'SQLite持久化(WAL+连接池)',
         ], YIWU_RED),
         ('数据层', '多源数据融合', [
-            '义乌指数API',
-            '商铺实时数据',
-            '海关合规数据库',
-            '39城政策数据库',
+            '义乌指数(真实源)',
+            '实时汇率(真实源)',
+            '义新欧线路(ETL管道)',
+            '商铺/39城政策(数据集)',
         ], ACCENT_GREEN),
     ]
 
@@ -899,7 +899,7 @@ def slide_tech_arch():
               fill_color=LIGHT_GRAY, line_color=None)
     add_textbox(slide, Inches(0.8), Inches(6.1), Inches(11.7), Inches(0.4),
                 'AI核心能力', font_size=16, font_color=YIWU_RED, bold=True)
-    ai_caps = 'GPT-4o 多语言理解  |  LangGraph Agent编排  |  RAG知识增强  |  向量检索  |  实时数据流  |  多模态内容生成  |  政策知识图谱'
+    ai_caps = '通义千问 qwen-plus 多语言理解  |  LangGraph Agent编排  |  RAG知识增强  |  向量检索  |  实时数据流(SSE)  |  多模态内容生成  |  政策知识图谱'
     add_textbox(slide, Inches(0.8), Inches(6.5), Inches(11.7), Inches(0.35),
                 ai_caps, font_size=13, font_color=MID_GRAY)
 
@@ -1184,7 +1184,7 @@ def slide_growth_flywheel():
 # ==================== 第21页：财务预测页（含39城收入） ====================
 def slide_financial():
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    add_page_header(slide, '财务预测', '12个月收入+39城复制，首月即实现正向现金流（已对齐《财务预测与商业计划》权威模型，M12累计营收697.1万）')
+    add_page_header(slide, '财务预测', '营收预测697.1万(0→1验证中)·净利率60-72%·LTV/CAC≈24:1·首月即正向现金流')
 
     # 收入数据表（季度聚合，源自《财务预测与商业计划》3.1/3.2/五章权威月度模型）
     months_data = [
