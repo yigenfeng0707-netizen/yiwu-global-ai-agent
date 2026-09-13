@@ -1,0 +1,86 @@
+[
+  {
+    "id": "kb-1039-guide",
+    "title": "1039市场采购贸易模式详解",
+    "tags": ["1039", "市场采购", "通关", "税务"],
+    "text": "1039市场采购贸易方式（海关监管代码1039）是指在经认定的市场集聚区内采购商品，由符合条件的经营者办理出口通关手续的贸易方式。核心要点：1)单票报关单商品货值15万美元（含）以下；2)免征增值税，不退税；3)简化申报，可按章申报，通关效率高；4)允许多个经营主体拼箱组货出口；5)需在商务部门办理市场采购贸易经营者备案，并通过市场采购贸易联网信息平台申报。义乌是全国首批试点城市（2013年获批），目前全国已推广至39个试点市场。适用场景：小商品、多品类、小批量、多批次的出口业务。",
+    "text_en": "1039 Market Purchase Trade (customs code 1039) allows simplified export clearance for goods purchased in designated market clusters with a single declaration value under USD 150,000. Key benefits: VAT exemption (no rebate), simplified declaration, consolidated container loading from multiple suppliers. Registration with commerce authorities and filing via the market purchase trade platform is required. Yiwu was China's first pilot city (2013); the scheme now covers 39 pilot markets nationwide. Ideal for small commodities, multi-category, small-batch exports."
+  },
+  {
+    "id": "kb-yixinou-routes",
+    "title": "义新欧班列线路、时效与费用",
+    "tags": ["义新欧", "班列", "物流", "铁路"],
+    "text": "义新欧班列（义乌-新疆-欧洲）从义乌西站始发，已开通19条线路，覆盖50多个国家160多个城市。主要线路：义乌-马德里（约18-21天，全球最长货运铁路线）、义乌-伦敦（约18天）、义乌-德黑兰（约14天）、义乌-阿拉木图（约7天）、义乌-莫斯科（约12天）、义乌-杜伊斯堡（约16天）。时效对比：班列14-21天到欧洲，海运28-35天，空运3-5天但成本最高。参考运费（运价）：20尺柜约5000-8000美元，40尺柜约8000-12000美元（随季节波动）。优势：时效比海运快一半，成本仅为空运1/5左右，且受天气影响小、碳排放低。发运可通过义乌保税物流中心（B型）装箱，旺季建议提前1个月预订舱位。",
+    "text_en": "Yixinou China-Europe Railway Express departs from Yiwu West Station with 19 routes covering 160+ cities in 50+ countries. Main routes: Yiwu-Madrid (~18-21 days, world's longest freight rail line), Yiwu-London (~18 days), Yiwu-Tehran (~14 days), Yiwu-Almaty (~7 days), Yiwu-Moscow (~12 days), Yiwu-Duisburg (~16 days). Reference cost: ~$5,000-8,000 per 20ft container, $8,000-12,000 per 40ft (seasonal). It is twice as fast as sea freight at about 1/5 the cost of air freight. Book space 1 month ahead in peak season via Yiwu Bonded Logistics Center (Type B)."
+  },
+  {
+    "id": "kb-market-overview",
+    "title": "义乌国际商贸城概况",
+    "tags": ["商贸城", "市场", "采购"],
+    "text": "义乌国际商贸城是全球最大的小商品批发市场，经营面积640余万平方米，拥有7.5万个商位、210万种以上商品，日均客流量约20万人次，商品出口到全球230多个国家和地区。市场分五个区：一区主营玩具、饰品、工艺品；二区主营五金、电子电器、箱包；三区主营文具、化妆品、眼镜；四区主营袜类、针织内衣、日用百货；五区主营进口商品、床上用品、汽车用品。采购建议：先确定品类所在区域，货比三家，多数商户支持小批量混批，可现场看样下单。",
+    "text_en": "Yiwu International Trade City is the world's largest small commodities wholesale market: 6.4M+ sqm, 75,000 booths, 2.1M+ product types, ~200,000 daily visitors, exporting to 230+ countries. Five districts: D1 toys/jewelry/crafts; D2 hardware/electronics/bags; D3 stationery/cosmetics/glasses; D4 socks/knitwear/daily goods; D5 imported goods/bedding/auto accessories. Most suppliers support small mixed batches."
+  },
+  {
+    "id": "kb-cert-eu",
+    "title": "欧盟市场准入认证指南",
+    "tags": ["认证", "欧盟", "CE", "REACH"],
+    "text": "出口欧盟主要认证要求：1)CE标志：绝大多数产品的强制准入标志，涉及LVD低电压指令、EMC电磁兼容指令、MD机械指令等；2)玩具：EN71系列安全测试+CE；3)饰品：镍释放量EN1811、REACH附录17铅镉限制；4)食品接触材料：EC 1935/2004框架法规；5)纺织品：EU 1007/2011标签法规，建议Oeko-Tex Standard 100生态认证；6)电子电器：CE+RoHS指令（限制有害物质）+WEEE回收指令；7)地毯建材：EN13501-1阻燃分级。认证周期一般4-8周，义乌市场内有华测、SGS等多家检测机构分支，可就近送检。",
+    "text_en": "EU market access certifications: CE marking is mandatory for most products (LVD, EMC, Machinery directives); toys need EN71 + CE; jewelry needs EN1811 nickel release and REACH Annex 17 lead/cadmium limits; food contact materials need EC 1935/2004; textiles need EU 1007/2011 labeling (Oeko-Tex 100 recommended); electronics need CE + RoHS + WEEE. Certification typically takes 4-8 weeks; SGS/CTI and other labs have branches in Yiwu."
+  },
+  {
+    "id": "kb-cert-us",
+    "title": "美国市场准入认证指南",
+    "tags": ["认证", "美国", "FDA", "UL"],
+    "text": "出口美国主要认证要求：1)玩具/儿童产品：ASTM F963标准+CPC儿童产品证书（CPSC认可实验室测试）；2)食品接触材料：FDA食品级认证；3)电子电器：UL或ETL安全认证（非强制但商超渠道普遍要求），FCC电磁兼容认证（强制）；4)纺织品：FTC标签规则，16 CFR阻燃标准；5)文具：LHAMA艺术材料无毒评估；6)化妆品：FDA MoCRA注册。注意：美国清关需进口商 Bond（海关保证金），建议使用DDP条款或与美国进口商配合。",
+    "text_en": "US market access: toys/children's products need ASTM F963 + CPC certificate (CPSC-accepted lab); food contact materials need FDA compliance; electronics need UL/ETL (retailer-required) + FCC (mandatory); textiles need FTC labeling + 16 CFR flammability; art materials need LHAMA; cosmetics need FDA MoCRA registration. US customs requires an importer bond."
+  },
+  {
+    "id": "kb-cert-mideast-eaeu",
+    "title": "中东与欧亚经济联盟认证指南",
+    "tags": ["认证", "中东", "SABER", "EAC"],
+    "text": "中东市场：沙特阿拉伯需SABER认证（原SASO升级），流程为先申请PCoC产品证书（1年有效），再逐批申请SCoC装运证书；阿联酋需ECAS认证；玩具出口海湾国家普遍需GSO标准测试。欧亚经济联盟（俄罗斯、哈萨克斯坦、白俄罗斯等5国）：需EAC认证，分CoC合格证书（高风险产品，需送样测试+工厂审核）和DoC符合性声明（中低风险产品）两种，证书在联盟五国通用。认证周期：SABER约2-4周，EAC约4-6周。义乌有多家代理可代办。",
+    "text_en": "Middle East: Saudi Arabia requires SABER certification (PCoC product certificate valid 1 year + per-shipment SCoC); UAE requires ECAS. EAEU (Russia, Kazakhstan, Belarus, etc.): EAC certification - CoC for high-risk products (testing + factory audit) or DoC for lower-risk. Valid across all 5 member states. Timeline: SABER ~2-4 weeks, EAC ~4-6 weeks."
+  },
+  {
+    "id": "kb-export-process",
+    "title": "义乌小商品跨境出口全流程",
+    "tags": ["流程", "出口", "报关"],
+    "text": "标准出口流程六步：1)选品采购：在义乌国际商贸城或义乌购（yiwugo.com）线上选品，确认MOQ、价格、交期；2)贸易备案：办理1039市场采购贸易经营者备案（一般贸易则无需）；3)订舱组货：选择物流方式（义新欧班列/海运/空运），多供应商货物可在义乌保税物流中心拼箱；4)出口报关：通过市场采购贸易联网信息平台申报，1039模式简化申报；5)国际运输：班列14-21天到欧洲，海运28-35天；6)目的国清关配送：准备CE/FDA等认证文件，缴纳关税后派送。全程可委托义乌本地货代代办，综合服务费率约3-5%。",
+    "text_en": "Standard export process: 1) Source products at Yiwu Trade City or yiwugo.com, confirm MOQ/price/lead time; 2) Register for 1039 market purchase trade; 3) Book freight (rail/sea/air), consolidate at Yiwu Bonded Logistics Center; 4) Export declaration via the market purchase trade platform; 5) International transport (rail 14-21 days to Europe, sea 28-35 days); 6) Destination customs clearance with CE/FDA documents and delivery. Local freight forwarders handle the full process for ~3-5% service fee."
+  },
+  {
+    "id": "kb-logistics-options",
+    "title": "物流方式对比与选择",
+    "tags": ["物流", "海运", "空运", "班列"],
+    "text": "三种主流物流方式对比：1)义新欧班列：义乌至欧洲14-21天，20尺柜约5000-8000美元，适合中高货值、时效敏感货物（圣诞用品、快时尚）；2)海运：宁波港/上海港出发，至欧洲28-35天，20尺柜约1500-3000美元，适合大宗低值货物；3)空运：义乌机场或杭州萧山机场，3-5天，约4-8美元/公斤，适合高货值小件急单。中东中亚方向：班列至阿拉木图7天、德黑兰14天，优势明显。选择建议：按'时效要求×货值密度'决策，旺季（9-11月）提前1-2个月订舱。",
+    "text_en": "Logistics comparison: Yixinou rail - 14-21 days to Europe, ~$5,000-8,000/20ft, best for time-sensitive mid-high value goods; sea freight via Ningbo/Shanghai - 28-35 days, ~$1,500-3,000/20ft, best for bulk low-value goods; air freight - 3-5 days, ~$4-8/kg, for urgent high-value small items. To Central Asia/Middle East, rail reaches Almaty in 7 days and Tehran in 14 days. Book 1-2 months ahead in peak season (Sep-Nov)."
+  },
+  {
+    "id": "kb-payment",
+    "title": "跨境支付与结算方式",
+    "tags": ["支付", "结算", "汇款"],
+    "text": "常见结算方式：1)T/T电汇：最常用，建议30%定金+70%发货前付清（新客户）或见提单副本付款（老客户）；2)信用证L/C：大额订单使用，注意软条款风险；3)第三方支付：PingPong、连连支付、万里汇等，费率0.3-1%，适合小额多频；4)人民币跨境结算：1039模式支持人民币结算，规避汇率风险。义乌本地支持市场采购贸易外汇结算便利化政策，个体户可直接收结汇。风险提示：警惕TT全额赊销、尼日利亚等高风险地区付款方式欺诈。",
+    "text_en": "Payment methods: T/T wire transfer is most common - 30% deposit + 70% before shipment for new customers; L/C for large orders (watch soft clauses); third-party platforms (PingPong, LianLian, WorldFirst) at 0.3-1% fees for small frequent payments; RMB cross-border settlement supported under 1039 mode. Yiwu's market purchase trade policy allows individual businesses to receive foreign exchange directly. Beware of full-credit terms and payment fraud from high-risk regions."
+  },
+  {
+    "id": "kb-dispute-guide",
+    "title": "贸易纠纷预防与处理",
+    "tags": ["纠纷", "售后", "风险"],
+    "text": "纠纷预防：1)合同明确质量标准、验收方式、交期、违约责任；2)大货生产前确认产前样（PP sample）；3)出货前安排第三方验货（义乌本地验货费约200-300美元/天）；4)保留聊天记录、合同、付款凭证、验货报告。纠纷处理路径：1)优先与供应商协商，义乌市场商户普遍重视信誉；2)向义乌国际商贸城市场管理部投诉（市场内设有纠纷调解中心）；3)向义乌市商务局或市场监管局反映；4)涉及金额较大可通过中国国际经济贸易仲裁委员会（CIETAC）仲裁或诉讼。跨境纠纷注意保留英文证据链。",
+    "text_en": "Dispute prevention: clear contracts on quality standards, inspection, lead time, liabilities; approve pre-production samples; arrange third-party inspection before shipping (~$200-300/day in Yiwu); keep all chat records, contracts, payment proofs. Resolution paths: negotiate with supplier first; complain to Yiwu Trade City management (on-site mediation center); escalate to Yiwu Commerce Bureau; arbitration via CIETAC for large amounts. Keep English evidence chains for cross-border disputes."
+  },
+  {
+    "id": "kb-moq-sourcing",
+    "title": "小批量采购与混批策略",
+    "tags": ["采购", "MOQ", "混批"],
+    "text": "义乌采购的MOQ特点：1)多数商户支持混批（不同款式混合凑单），日用百货一般1-5箱起订，饰品可低至几十件，袜子500-1000双起订（可混色混码）；2)试单建议：先小批量多款式测款，热销后返单放大；3)义乌购（yiwugo.com）可线上看样、联系商户；4)组货技巧：多供应商货物集中在义乌保税物流中心拼整柜，降低物流成本；5)议价空间：现金现货通常有3-8%议价空间，大单（整柜）可达10-15%。",
+    "text_en": "Yiwu MOQ characteristics: most suppliers support mixed batches - daily goods from 1-5 cartons, jewelry from dozens of pieces, socks from 500-1000 pairs (mixed colors/sizes). Strategy: test small batches across styles, then scale winners. yiwugo.com supports online sourcing. Consolidate multi-supplier goods at Yiwu Bonded Logistics Center into full containers. Negotiation: 3-8% for cash spot deals, 10-15% for container orders."
+  },
+  {
+    "id": "kb-seasonal-planning",
+    "title": "季节性商品备货节奏",
+    "tags": ["备货", "季节", "圣诞"],
+    "text": "季节性商品备货时间线（以欧洲市场为例）：圣诞用品：3-5月下单，6-8月生产，9-10月发货（义新欧班列14-21天），确保11月上旬上架；万圣节用品：提前4个月下单，8月中旬前发货；夏季户外用品：前一年12月-2月下单，4月前到仓；斋月用品（中东市场）：斋月前3个月下单，前6周到港。义乌圣诞用品占全球出口约80%，旺季（6-9月）工厂排产紧张，建议锁定产能并预付定金。",
+    "text_en": "Seasonal stocking timeline (Europe): Christmas goods - order Mar-May, produce Jun-Aug, ship Sep-Oct (rail 14-21 days), on shelf by early Nov; Halloween - order 4 months ahead, ship by mid-Aug; summer outdoor - order Dec-Feb, arrive by Apr; Ramadan goods (Middle East) - order 3 months ahead, arrive 6 weeks before. Yiwu supplies ~80% of global Christmas exports; factories are tight Jun-Sep, lock capacity with deposits early."
+  }
+]

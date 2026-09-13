@@ -12,18 +12,25 @@ from ..data.customer_service_data import (
     AUTO_REPLY_TEMPLATES,
 )
 from ..services.llm import llm_service
+from ..services.rag import rag_service
 
 
 class CustomerServiceAgent(BaseAgent):
-    """智能客服Agent - 情绪识别、FAQ匹配、纠纷检测、智能回复"""
+    """智能客服Agent - 情绪识别、FAQ匹配、纠纷检测、RAG增强智能回复"""
 
     name = "customer_service"
-    description = "智能客服Agent - 情绪识别、FAQ匹配、纠纷检测、智能回复"
+    description = "智能客服Agent - 情绪识别、FAQ匹配、纠纷检测、RAG增强智能回复"
 
     LLM_SYSTEM_PROMPT = (
         "你是义乌小商品出海智能客服，专精1039市场采购贸易、义新欧班列、"
-        "义乌国际商贸城等领域的咨询。回答要专业、简洁、实用。"
+        "义乌国际商贸城、出口认证等领域的咨询。回答要专业、简洁、实用。"
+        "如果提供了知识库资料，请优先依据资料回答；资料中没有的信息可以"
+        "结合专业知识补充，但不得编造具体数字、电话、政策条款。"
     )
+
+    # FAQ 直答阈值：bigram Dice 相似度，只有高度近似预设问题才直接给固定答案，
+    # 避免旧版字符集相似度（阈值0.3）误命中、拦截 LLM/RAG 链路
+    FAQ_DIRECT_THRESHOLD = 0.55
 
     def __init__(self):
         super().__init__()
@@ -131,20 +138,25 @@ class CustomerServiceAgent(BaseAgent):
         for faq in faqs:
             q = faq.get("q_zh" if language == "zh" else "q_en", "")
             score = self._calculate_similarity(message, q)
-            if score > best_score and score > 0.3:
+            if score > best_score and score >= self.FAQ_DIRECT_THRESHOLD:
                 best_score = score
                 best_match = faq
 
         return best_match
 
+    @staticmethod
+    def _bigrams(text: str) -> set:
+        text = text.lower()
+        grams = {text[i:i + 2] for i in range(len(text) - 1)}
+        return grams or set(text)
+
     def _calculate_similarity(self, text1: str, text2: str) -> float:
-        """简单相似度计算"""
-        words1 = set(text1)
-        words2 = set(text2)
-        if not words1 or not words2:
-            return 0
-        intersection = words1 & words2
-        return len(intersection) / max(len(words1), len(words2))
+        """字符 bigram Dice 相似度：比单字集合交并比更能区分语序与真实语义重合"""
+        b1 = self._bigrams(text1)
+        b2 = self._bigrams(text2)
+        if not b1 or not b2:
+            return 0.0
+        return 2.0 * len(b1 & b2) / (len(b1) + len(b2))
 
     def _detect_dispute(self, message: str) -> Dict[str, Any]:
         """纠纷检测"""
@@ -163,14 +175,26 @@ class CustomerServiceAgent(BaseAgent):
         return {"detected": detected, "type": dispute_type}
 
     async def _llm_chat(
-        self, message: str, session_id: str = "default"
+        self,
+        message: str,
+        session_id: str = "default",
+        contexts: Optional[List[Dict[str, Any]]] = None,
+        language: str = "zh",
     ) -> Optional[str]:
-        """调用DashScope Qwen模型生成回复（含超时保护）"""
+        """调用LLM生成回复（RAG 上下文注入 + 超时保护）"""
         import asyncio
+
+        system_prompt = self.LLM_SYSTEM_PROMPT
+        if contexts:
+            refs = "\n\n".join(
+                f"[资料{i + 1}] {c['title']}\n{c['text'] if language == 'zh' else c['text_en']}"
+                for i, c in enumerate(contexts)
+            )
+            system_prompt += f"\n\n以下是从知识库检索到的相关资料：\n{refs}"
 
         # 构建对话历史
         history = self.sessions.get(session_id, [])
-        messages = [{"role": "system", "content": self.LLM_SYSTEM_PROMPT}]
+        messages = [{"role": "system", "content": system_prompt}]
         for msg in history[-10:]:  # 最近10轮对话
             role = "user" if msg["role"] == "user" else "assistant"
             messages.append({"role": role, "content": msg["text"]})
@@ -196,33 +220,73 @@ class CustomerServiceAgent(BaseAgent):
         dispute: Dict,
         session_id: str = "default",
     ) -> Dict[str, Any]:
-        """生成回复"""
-        # FAQ匹配回复优先
+        """生成回复（FAQ 直答 → RAG 检索增强 LLM → 知识库摘录 → 兜底模板）
+
+        reply.source 标记回复来源，前端可据此展示"FAQ / 知识库 / AI"徽标：
+        - faq：高置信命中预设 FAQ，直接返回标准答案
+        - rag：LLM 基于知识库检索资料生成
+        - llm：LLM 直接生成（知识库无命中）
+        - kb：LLM 不可用，直接摘录知识库最相关资料
+        - template：LLM 与知识库均不可用时的关键词模板
+        - fallback：无任何可用信息
+        """
+        # 1) FAQ 高置信直答（阈值 0.55，仅近似预设问题时触发）
         if faq_match:
             answer_key = "a_zh" if language == "zh" else "a_en"
-            return {"text": faq_match.get(answer_key, "")}
+            question_key = "q_zh" if language == "zh" else "q_en"
+            return {
+                "text": faq_match.get(answer_key, ""),
+                "source": "faq",
+                "references": [faq_match.get(question_key, "")],
+            }
 
-        # 纠纷处理：先用模板回复，再调用LLM给出详细建议
+        # 2) RAG 检索（LLM 可用与否都先检索，作为生成上下文或降级答案）
+        contexts = await rag_service.retrieve(message, top_k=3, language=language)
+        references = [c["title"] for c in contexts]
+
+        # 3) 纠纷处理：先用模板安抚，再调用 LLM（带知识库上下文）给出详细建议
         if dispute.get("detected"):
             template_reply = AUTO_REPLY_TEMPLATES["dispute_detected"]
             llm_reply = await self._llm_chat(
                 f"用户遇到纠纷：{message}，纠纷类型：{dispute.get('type', '未知')}。请给出详细的处理建议。",
                 session_id,
+                contexts=contexts,
+                language=language,
             )
             if llm_reply:
-                return {"text": f"{template_reply}\n\n📋 详细建议：\n{llm_reply}"}
-            return {"text": template_reply}
+                return {
+                    "text": f"{template_reply}\n\n📋 详细建议：\n{llm_reply}",
+                    "source": "rag" if contexts else "llm",
+                    "references": references,
+                }
+            return {"text": template_reply, "source": "template", "references": references}
 
-        # 其他情况：调用LLM生成回复
-        llm_reply = await self._llm_chat(message, session_id)
+        # 4) 常规问题：RAG 检索增强 LLM 生成
+        llm_reply = await self._llm_chat(message, session_id, contexts=contexts, language=language)
         if llm_reply:
-            return {"text": llm_reply}
+            return {
+                "text": llm_reply,
+                "source": "rag" if contexts else "llm",
+                "references": references,
+            }
 
-        # LLM不可用时，回退到关键词模板回复
+        # 5) LLM 不可用但知识库有命中：摘录最相关资料，明确标注来源，不冒充智能回答
+        if contexts:
+            top = contexts[0]
+            top_text = top["text"] if language == "zh" else top["text_en"]
+            note = "（当前智能生成服务暂不可用，以下为知识库中最相关的资料摘录）" if language == "zh" \
+                else "(AI generation is temporarily unavailable; below is the most relevant knowledge base entry)"
+            return {
+                "text": f"{note}\n\n【{top['title']}】\n{top_text}",
+                "source": "kb",
+                "references": references,
+            }
+
+        # 6) 关键词模板兜底
         if any(kw in message for kw in ["物流", "运输", "发货", "班列", "快递"]):
-            return {"text": AUTO_REPLY_TEMPLATES["logistics_inquiry"]}
+            return {"text": AUTO_REPLY_TEMPLATES["logistics_inquiry"], "source": "template", "references": []}
 
         if any(kw in message for kw in ["认证", "CE", "EAC", "SABER", "检测"]):
-            return {"text": AUTO_REPLY_TEMPLATES["certification_inquiry"]}
+            return {"text": AUTO_REPLY_TEMPLATES["certification_inquiry"], "source": "template", "references": []}
 
-        return {"text": AUTO_REPLY_TEMPLATES["unknown"]}
+        return {"text": AUTO_REPLY_TEMPLATES["unknown"], "source": "fallback", "references": []}

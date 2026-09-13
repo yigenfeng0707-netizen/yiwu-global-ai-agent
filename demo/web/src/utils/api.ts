@@ -2,7 +2,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 import {
   mockMarketInsight, mockSmartSelection, mockSupplyChain, mockLogistics,
-  mockContentGeneration, mockCompliance, mockTariff, mockChatReply,
+  mockContentGeneration, mockCompliance, mockTariff,
   mockFAQ, mockPipeline, mockPolicyCities, mockPolicyGuide,
   mockPolicyBenefit, mockPolicyCases,
 } from './mockData';
@@ -111,7 +111,7 @@ export interface LogisticsData {
 }
 
 export interface ChatResponseData {
-  reply: { text: string };
+  reply: { text: string; source?: 'faq' | 'rag' | 'llm' | 'kb' | 'template' | 'fallback'; references?: string[] };
   emotion?: { type: string; label: string; color: string };
   dispute?: { detected: boolean; type?: string };
   needs_human_escalation: boolean;
@@ -254,12 +254,9 @@ export async function calculateTariff(req: { category: string; target_country: s
   );
 }
 
-// 智能客服
+// 智能客服（对话必须真实：后端不可用时抛错由页面提示，绝不用 mock 冒充回答）
 export async function sendChatMessage(req: { message: string; category: string; language: string; session_id: string }): Promise<ChatResponseData> {
-  return withSource(
-    apiFetch<ChatResponseData>('/customer-service/chat', { method: 'POST', body: JSON.stringify(req), timeout: 45000 }),
-    () => mockChatReply(req.message),
-  );
+  return apiFetch<ChatResponseData>('/customer-service/chat', { method: 'POST', body: JSON.stringify(req), timeout: 45000 });
 }
 
 // FAQ

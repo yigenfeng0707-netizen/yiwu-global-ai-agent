@@ -27,7 +27,18 @@ interface ChatMessage {
   text: string;
   emotion?: { type: string; label: string; color: string };
   dispute?: boolean;
+  source?: string;
 }
+
+// 回复来源徽标（与后端 reply.source 对应）
+const SOURCE_LABELS: Record<string, string> = {
+  faq: 'FAQ 标准答案',
+  rag: '知识库增强 AI',
+  llm: 'AI 生成',
+  kb: '知识库摘录',
+  template: '模板回复',
+  fallback: '兜底回复',
+};
 
 interface FAQItem { question: string; answer: string; }
 
@@ -88,11 +99,12 @@ export default function CustomerService() {
     setSending(true);
     try {
       const d = await sendChatMessage({ message: msg, category, language, session_id: sessionId });
-      const replyText = d?.reply?.text || '';
-      const finalText = replyText || `关于"${msg}"的问题，根据义乌小商品出海经验：\n\n1. 1039市场采购贸易模式可免征增值税\n2. 义新欧班列14-21天直达欧洲\n3. 建议通过义乌国际商贸城7.5万商户进行采购\n\n如需更详细的信息，请告诉我具体的品类和目标市场。`;
+      const replyText = d?.reply?.text?.trim();
+      if (!replyText) throw new Error('empty reply');
       setMessages((prev) => [...prev, {
         role: 'bot',
-        text: finalText,
+        text: replyText,
+        source: d?.reply?.source,
         emotion: d?.emotion ? { type: d.emotion.type || 'neutral', label: d.emotion.label || '中性', color: d.emotion.color || '#9ca3af' } : { type: 'neutral', label: '中性', color: '#9ca3af' },
         dispute: d?.dispute?.detected || false,
       }]);
@@ -101,9 +113,10 @@ export default function CustomerService() {
         setMessages((prev) => [...prev, { role: 'bot', text: '⚠️ 已为您转接人工客服，请稍候...' }]);
       }
     } catch {
+      // 后端不可用：如实提示，不冒充回答
       setMessages((prev) => [...prev, {
         role: 'bot',
-        text: `关于"${msg}"的问题，根据义乌小商品出海经验：\n\n1. 1039市场采购贸易模式可免征增值税\n2. 义新欧班列14-21天直达欧洲\n3. 建议通过义乌国际商贸城7.5万商户进行采购\n\n如需更详细的信息，请告诉我具体的品类和目标市场。`,
+        text: '客服服务暂时不可用，请稍后重试。如急需帮助，请联系义乌国际商贸城客服热线：0579-85560000。',
         emotion: { type: 'neutral', label: '中性', color: '#9ca3af' },
       }]);
     } finally {
@@ -172,6 +185,11 @@ export default function CustomerService() {
                   )}
                   {msg.dispute && <AlertTriangle size={12} className="text-red-400" />}
                   <span className="text-xs text-gray-500">{msg.role === 'user' ? '我' : 'AI 客服'}</span>
+                  {msg.role === 'bot' && msg.source && (
+                    <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-500">
+                      {SOURCE_LABELS[msg.source] || msg.source}
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
               </div>
